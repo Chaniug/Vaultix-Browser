@@ -36,40 +36,33 @@ function item(source, id) {
 test('优先级排序：bitwarden 默认排在 keepassxc 之前', async () => {
   const bw = makeAdapter('bitwarden', [item('bitwarden', 'bw-1')]);
   const kp = makeAdapter('keepassxc', [item('keepassxc', 'kp-1')]);
-  const { items, ambiguous } = await searchAcrossBackends(
-    [kp, bw],
-    { url: 'https://example.com' },
+  const { items, ambiguous } = await searchAcrossBackends([kp, bw], { url: 'https://example.com' });
+  assert.deepEqual(
+    items.map((i) => i.source),
+    ['bitwarden', 'keepassxc'],
   );
-  assert.deepEqual(items.map((i) => i.source), ['bitwarden', 'keepassxc']);
   assert.equal(ambiguous, true, '双源命中应标记歧义');
 });
 
 test('单源命中不标记歧义', async () => {
   const bw = makeAdapter('bitwarden', [item('bitwarden', 'bw-1')]);
-  const { items, ambiguous } = await searchAcrossBackends(
-    [bw],
-    { url: 'https://example.com' },
-  );
+  const { items, ambiguous } = await searchAcrossBackends([bw], { url: 'https://example.com' });
   assert.equal(items.length, 1);
   assert.equal(ambiguous, false);
 });
 
 test('S-6 防伪造：丢弃 source 与适配器声明不符的条目', async () => {
   const bw = makeAdapter('bitwarden', [item('keepassxc', 'forged')]);
-  const { items } = await searchAcrossBackends(
-    [bw],
-    { url: 'https://example.com' },
-  );
+  const { items } = await searchAcrossBackends([bw], { url: 'https://example.com' });
   assert.equal(items.length, 0, '伪造来源的条目必须被丢弃');
 });
 
 test('容错：单后端抛错时不拖垮其他来源', async () => {
   const broken = makeAdapter('bitwarden', [], { throws: true });
   const kp = makeAdapter('keepassxc', [item('keepassxc', 'kp-1')]);
-  const { items, ambiguous } = await searchAcrossBackends(
-    [broken, kp],
-    { url: 'https://example.com' },
-  );
+  const { items, ambiguous } = await searchAcrossBackends([broken, kp], {
+    url: 'https://example.com',
+  });
   assert.equal(items.length, 1);
   assert.equal(items[0].source, 'keepassxc');
   assert.equal(ambiguous, false);
@@ -80,9 +73,9 @@ test('未就绪的后端被跳过', async () => {
     ready: false,
   });
   const kp = makeAdapter('keepassxc', [item('keepassxc', 'kp-1')]);
-  const { items } = await searchAcrossBackends(
-    [locked, kp],
-    { url: 'https://example.com' },
+  const { items } = await searchAcrossBackends([locked, kp], { url: 'https://example.com' });
+  assert.deepEqual(
+    items.map((i) => i.source),
+    ['keepassxc'],
   );
-  assert.deepEqual(items.map((i) => i.source), ['keepassxc']);
 });

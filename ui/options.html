@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>Vaultix Browser 设置</title>
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+      body { max-width: 560px; margin: 32px auto; padding: 0 16px; }
+      label { display: block; margin-top: 12px; font-size: 13px; }
+      input, select { width: 100%; padding: 8px; box-sizing: border-box; margin-top: 4px; }
+      button { margin-top: 16px; padding: 8px 14px; cursor: pointer; }
+      .hint { font-size: 12px; opacity: 0.7; }
+    </style>
+  </head>
+  <body>
+    <h1>Vaultix Browser 设置</h1>
+    <label>Bitwarden 服务地址
+      <input id="server-url" type="url" placeholder="https://vault.example.com" />
+    </label>
+    <label>后端类型
+      <select id="mode">
+        <option value="bitwarden.cloud">Bitwarden 官方云</option>
+        <option value="vaultwarden">自建 Vaultwarden</option>
+      </select>
+    </label>
+    <label>邮箱
+      <input id="email" type="email" autocomplete="username" />
+    </label>
+    <label>后台锁定（分钟）
+      <input id="background-lock" type="number" min="1" value="5" />
+    </label>
+    <label>空闲锁定（分钟）
+      <input id="idle-lock" type="number" min="1" value="15" />
+    </label>
+    <p class="hint">主密码与派生密钥不会保存；浏览器重启后需重新解锁。</p>
+    <button id="save" type="button">保存设置</button>
+    <span id="saved"></span>
+    <h2>KeePassXC</h2>
+    <p class="hint">需安装 keepassxc-proxy 并在 KeePassXC 中允许本扩展连接。</p>
+    <button id="associate" type="button">配对 KeePassXC</button>
+    <span id="association-status"></span>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

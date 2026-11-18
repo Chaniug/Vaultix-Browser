@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>Vaultix Browser</title>
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+      body { width: 340px; margin: 0; padding: 12px; }
+      h1 { font-size: 15px; margin: 0 0 8px; }
+      #status { font-size: 12px; opacity: 0.8; margin-bottom: 8px; }
+      label { display: block; font-size: 12px; margin-top: 6px; }
+      input { width: 100%; box-sizing: border-box; padding: 6px; margin-top: 2px; }
+      button { margin-top: 8px; padding: 6px 10px; cursor: pointer; }
+      .item { border-top: 1px solid #8884; padding: 8px 0; }
+      .item-title { font-weight: 600; font-size: 13px; }
+      .item-subtitle { font-size: 12px; opacity: 0.75; }
+      .actions button { margin: 6px 6px 0 0; font-size: 11px; }
+      .note { font-size: 11px; opacity: 0.75; margin-bottom: 6px; }
+    </style>
+  </head>
+  <body>
+    <h1>Vaultix Browser</h1>
+    <div id="status">检查状态中…</div>
+    <label>主密码（仅内存态）
+      <input id="master-password" type="password" autocomplete="current-password" />
+    </label>
+    <label>两步验证码（如需要）
+      <input id="two-factor" type="text" autocomplete="one-time-code" />
+    </label>
+    <button id="unlock" type="button">解锁</button>
+    <button id="lock" type="button">锁定</button>
+    <div id="results"></div>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
