@@ -5,7 +5,7 @@
  * 解密受保护对称密钥 → AES-256-CBC 解密字段（type=2，带 HMAC-SHA256）。
  * 实现为协议重实现，不复制 bitwarden/clients 源码（L-3）。
  */
-import { base64ToBytes, bytesToUtf8, utf8ToBytes } from '../../shared/encoding.js';
+import { base64ToBytes, bytesToBase64, bytesToUtf8, utf8ToBytes } from '../../shared/encoding.js';
 import { ERROR_CODES, VaultixError } from '../../shared/errors.js';
 
 const PBKDF2_ITERATIONS = 100_000;
@@ -162,4 +162,42 @@ export async function decryptCipherString(
     if (error instanceof VaultixError) throw error;
     throw new VaultixError(ERROR_CODES.DECRYPT_FAILED);
   }
+}
+
+/** AES-256-CBC 加密 + PKCS7 填充（WebCrypto 自动处理填充） */
+async function aesCbcEncrypt(
+  data: Uint8Array,
+  key: Uint8Array,
+  iv: Uint8Array,
+): Promise<Uint8Array> {
+  const cryptoKey = await subtle().importKey('raw', bufferSource(key), { name: 'AES-CBC' }, false, [
+    'encrypt',
+  ]);
+  const encrypted = await subtle().encrypt(
+    { name: 'AES-CBC', iv: bufferSource(iv) },
+    cryptoKey,
+    bufferSource(data),
+  );
+  return new Uint8Array(encrypted);
+}
+
+/** 加密 Bitwarden 字段字符串为 type=2 格式（与 decryptCipherString 对称） */
+export async function encryptCipherString(
+  value: string,
+  symmetricKey: Uint8Array,
+): Promise<string> {
+  if (symmetricKey.length < 64) throw new VaultixError(ERROR_CODES.DECRYPT_FAILED);
+  const iv = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  const ciphertext = await aesCbcEncrypt(utf8ToBytes(value), symmetricKey.slice(0, 32), iv);
+  const macKey = await subtle().importKey(
+    'raw',
+    bufferSource(symmetricKey.slice(32, 64)),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const mac = new Uint8Array(
+    await subtle().sign('HMAC', macKey, bufferSource(concatBytes(iv, ciphertext))),
+  );
+  return `2.${bytesToBase64(iv)}.${bytesToBase64(ciphertext)}.${bytesToBase64(mac)}`;
 }

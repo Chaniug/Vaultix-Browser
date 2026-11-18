@@ -29,6 +29,7 @@ async function load(): Promise<void> {
     'email',
     'backgroundLockMs',
     'idleLockMs',
+    'defaultSaveSource',
   ]);
   if (typeof stored.serverUrl === 'string') setValue('server-url', stored.serverUrl);
   if (stored.mode === 'bitwarden.cloud' || stored.mode === 'vaultwarden') {
@@ -41,6 +42,9 @@ async function load(): Promise<void> {
   if (typeof stored.idleLockMs === 'number') {
     setValue('idle-lock', String(stored.idleLockMs / 60_000));
   }
+  if (stored.defaultSaveSource === 'bitwarden' || stored.defaultSaveSource === 'keepassxc') {
+    setValue('default-save-source', stored.defaultSaveSource);
+  }
 }
 
 async function save(): Promise<void> {
@@ -51,6 +55,7 @@ async function save(): Promise<void> {
     serverUrl: valueOf('server-url'),
     mode,
     email: valueOf('email'),
+    defaultSaveSource: valueOf('default-save-source') === 'keepassxc' ? 'keepassxc' : 'bitwarden',
     lockPolicy: {
       backgroundLockMs: backgroundMinutes * 60_000,
       idleLockMs: idleMinutes * 60_000,

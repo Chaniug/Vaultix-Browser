@@ -3,7 +3,7 @@
  * 创建适配器 → 注入合并器 → 向 UI 提供统一结果；不直接操作 DOM。
  */
 import { searchAcrossBackends } from '../core/merger.js';
-import type { BackendAdapter, SearchQuery } from '../core/types.js';
+import type { BackendAdapter, BackendSource, CredentialDraft, SearchQuery } from '../core/types.js';
 import { DEFAULT_LOCK_POLICY, LockManager } from '../core/lock-manager.js';
 import type { LockPolicy } from '../core/lock-manager.js';
 import {
@@ -26,15 +26,25 @@ interface StoredSettings {
   readonly email?: string;
   readonly association?: KeePassAssociation | null;
   readonly lockPolicy?: LockPolicy;
+  readonly defaultSaveSource?: BackendSource;
 }
 
-const SETTINGS_KEYS = ['serverUrl', 'mode', 'email', 'association', 'lockPolicy'];
+const SETTINGS_KEYS = [
+  'serverUrl',
+  'mode',
+  'email',
+  'association',
+  'lockPolicy',
+  'defaultSaveSource',
+];
 const OFFSCREEN_URL = 'ui/offscreen.html';
 
 let settings: StoredSettings = {};
 let bitwarden: BitwardenAdapter | null = null;
 let keepass: KeePassRpcAdapter | null = null;
 let lockManager: LockManager | null = null;
+/** 待用户确认的保存候选，仅内存态（S-1：绝不写盘） */
+let pendingSave: CredentialDraft | null = null;
 
 async function loadSettings(): Promise<void> {
   const stored = await chrome.storage.local.get([...SETTINGS_KEYS]);
@@ -104,6 +114,10 @@ function statusResponse(): StatusResponse {
     bitwardenReady: bitwarden?.isReady() ?? false,
     keepassReady: keepass?.isReady() ?? false,
     needsAssociation: keepass !== null && !keepass.isReady(),
+    canWrite:
+      (bitwarden?.capabilities.write === true && bitwarden.isReady()) ||
+      (keepass?.capabilities.write === true && keepass.isReady()),
+    defaultSaveSource: settings.defaultSaveSource ?? 'bitwarden',
   };
 }
 
@@ -202,6 +216,40 @@ chrome.runtime.onMessage.addListener((raw, _sender, sendResponse) => {
           const association = await keepass.associate();
           await chrome.storage.local.set({ association });
           sendResponse({ ok: true });
+          break;
+        }
+        case MSG.SAVE_CANDIDATE:
+          // 仅存内存，等待用户确认；不写 storage（S-1）
+          pendingSave = raw.draft;
+          sendResponse({ ok: true });
+          break;
+        case MSG.PENDING_SAVE: {
+          const adapters = await ensureAdapters();
+          sendResponse({
+            draft: pendingSave,
+            sources: adapters
+              .filter((adapter) => adapter.capabilities.write && adapter.isReady())
+              .map((adapter) => adapter.source),
+          });
+          break;
+        }
+        case MSG.SAVE_DECISION: {
+          const draft = pendingSave ?? raw.draft;
+          pendingSave = null;
+          if (raw.source === null) {
+            sendResponse({ ok: false });
+            break;
+          }
+          const adapters = await ensureAdapters();
+          const adapter = adapters.find(
+            (item) => item.source === raw.source && item.capabilities.write,
+          );
+          if (!adapter || !adapter.isReady()) {
+            sendResponse({ ok: false });
+            break;
+          }
+          const result = await adapter.save(draft);
+          sendResponse(result);
           break;
         }
         case MSG.FILL: {

@@ -1,6 +1,6 @@
 /** 扩展内部消息协议。所有消息只在扩展进程间传递，不进入页面上下文（S-4）。 */
 import type { MergeResult } from '../core/merger.js';
-import type { SearchQuery } from '../core/types.js';
+import type { BackendSource, CredentialDraft, SaveResult, SearchQuery } from '../core/types.js';
 
 export const MSG = {
   SEARCH: 'vaultix:search',
@@ -11,6 +11,9 @@ export const MSG = {
   ASSOCIATE: 'vaultix:associate',
   COPY: 'vaultix:copy',
   FIELDS_CHANGED: 'vaultix:fields-changed',
+  SAVE_CANDIDATE: 'vaultix:save-candidate',
+  PENDING_SAVE: 'vaultix:pending-save',
+  SAVE_DECISION: 'vaultix:save-decision',
 } as const;
 
 export interface SearchMessage {
@@ -56,6 +59,24 @@ export interface FieldsChangedMessage {
   readonly fields: readonly string[];
 }
 
+/** content 检测到表单提交后上报的保存候选（明文仅在扩展进程内存流转，S-1/S-4） */
+export interface SaveCandidateMessage {
+  readonly type: typeof MSG.SAVE_CANDIDATE;
+  readonly draft: CredentialDraft;
+}
+
+/** popup 拉取当前待确认的保存候选 */
+export interface PendingSaveMessage {
+  readonly type: typeof MSG.PENDING_SAVE;
+}
+
+/** popup 用户决策：确认写入某后端，或取消 */
+export interface SaveDecisionMessage {
+  readonly type: typeof MSG.SAVE_DECISION;
+  readonly draft: CredentialDraft;
+  readonly source: BackendSource | null;
+}
+
 export type RuntimeMessage =
   | SearchMessage
   | FillMessage
@@ -64,16 +85,28 @@ export type RuntimeMessage =
   | LockMessage
   | AssociateMessage
   | CopyMessage
-  | FieldsChangedMessage;
+  | FieldsChangedMessage
+  | SaveCandidateMessage
+  | PendingSaveMessage
+  | SaveDecisionMessage;
 
 export interface StatusResponse {
   readonly state: 'locked' | 'unlocked' | 'suspended';
   readonly bitwardenReady: boolean;
   readonly keepassReady: boolean;
   readonly needsAssociation: boolean;
+  readonly canWrite: boolean;
+  /** 默认保存目标，来自设置页 */
+  readonly defaultSaveSource: BackendSource;
 }
 
-export type MessageResponse = MergeResult | StatusResponse | { ok: boolean } | null;
+export interface PendingSaveResponse {
+  readonly draft: CredentialDraft | null;
+  readonly sources: readonly BackendSource[];
+}
+
+export type MessageResponse =
+  MergeResult | StatusResponse | SaveResult | PendingSaveResponse | { ok: boolean } | null;
 
 export function isRuntimeMessage(value: unknown): value is RuntimeMessage {
   if (typeof value !== 'object' || value === null) return false;

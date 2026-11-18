@@ -14,3 +14,7 @@ coverage/
 .idea/
 .DS_Store
 Thumbs.db
+
+# CRX 签名私钥（勿提交）
+*.pem
+*.crx

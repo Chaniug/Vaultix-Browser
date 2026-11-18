@@ -5,7 +5,7 @@
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 [![Manifest](https://img.shields.io/badge/Manifest-V3-orange.svg)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
-[![Status](https://img.shields.io/badge/Status-P3%20完成-brightgreen.svg)](#路线图)
+[![Status](https://img.shields.io/badge/Status-P4%20完成-brightgreen.svg)](#路线图)
 
 ---
 
@@ -53,6 +53,7 @@ Vaultix 管住了手机，但网页登录仍要依赖别的插件。本项目把
 | P1 | 接通 KeePassRPC（associate → get-logins → get-totp），验证填充 | ✅ 完成 |
 | P2 | 接通 Bitwarden（登录 → sync → 解密 → 只读列表），覆盖官方云与自建 | ✅ 完成 |
 | P3 | 双源合并搜索、来源标记、冲突选择、锁定策略 | ✅ 完成 |
+| P4 | 写回凭证（Bitwarden Cipher / KeePassRPC set-login）+ 保存提示，DEC-010 | ✅ 完成 |
 
 ## 本地开发
 

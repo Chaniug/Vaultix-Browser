@@ -1,7 +1,7 @@
 /** Popup UI：只依赖 core 契约，不 import 任何适配器（E-2）。 */
 import type { MergeResult } from '../core/merger.js';
-import type { CredentialItem } from '../core/types.js';
-import { MSG, type StatusResponse } from '../shared/messages.js';
+import type { BackendSource, CredentialItem } from '../core/types.js';
+import { MSG, type PendingSaveResponse, type StatusResponse } from '../shared/messages.js';
 import { STRINGS } from './strings.js';
 
 function byId(id: string): HTMLElement {
@@ -113,6 +113,7 @@ async function refresh(): Promise<void> {
     return;
   }
   for (const item of result.items) resultsEl.append(renderItem(item));
+  if (status.canWrite) await renderSavePrompt();
 }
 
 async function unlock(): Promise<void> {
@@ -141,3 +142,54 @@ byId('lock').addEventListener('click', () => {
 });
 
 void refresh();
+
+/** 保存确认 UI：凭证只在内存中展示，用户确认后写回密码库（DEC-010） */
+async function renderSavePrompt(): Promise<boolean> {
+  const pending = (await request({
+    type: MSG.PENDING_SAVE,
+  })) as PendingSaveResponse;
+  if (!pending.draft || pending.sources.length === 0) return false;
+
+  const container = document.createElement('div');
+  container.className = 'save-prompt';
+  const title = document.createElement('div');
+  title.className = 'item-title';
+  title.textContent = '保存新密码？';
+  container.append(title);
+  const detail = document.createElement('div');
+  detail.className = 'item-subtitle';
+  detail.textContent = `${new URL(pending.draft.url).hostname} · ${pending.draft.username}`;
+  container.append(detail);
+
+  const decide = async (source: BackendSource | null): Promise<void> => {
+    const result = (await request({
+      type: MSG.SAVE_DECISION,
+      draft: pending.draft,
+      source,
+    })) as { ok: boolean };
+    statusEl.textContent = result.ok
+      ? `已保存到 ${source ? sourceLabel(source) : ''}`
+      : '保存失败或未选择';
+    container.remove();
+  };
+
+  for (const source of pending.sources) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = `保存到 ${sourceLabel(source)}`;
+    button.addEventListener('click', () => {
+      void decide(source);
+    });
+    container.append(button);
+  }
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.textContent = '取消';
+  cancel.addEventListener('click', () => {
+    void decide(null);
+  });
+  container.append(cancel);
+
+  resultsEl.prepend(container);
+  return true;
+}
