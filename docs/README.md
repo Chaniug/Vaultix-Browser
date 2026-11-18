@@ -4,21 +4,34 @@
 
 ## 当前状态
 
-- 设计阶段，P0 契约尚未定稿。
-- 已确认的两条硬约束：
+- **规约已立**（2026-11-18）：范围、红线、门禁三份文档定稿；P0 契约尚未开始。
+- 已确认的硬约束：
   - **许可证**：上游 KeePassXC-Browser 与 bitwarden/clients 均为 GPL-3.0 → 本项目同协议。
   - **后端形态**：KDBX 不在扩展内解密（走 KeePassRPC）；Bitwarden 官方云与 Vaultwarden 共用 Client API，仅 base URL 不同。
+  - **门禁**：七道 CI 门禁分开单跑，禁止串联（见 `02`）。
+- 待拍板：D-01 统一模型基准 / D-02 冲突处理 / D-03 浏览器范围（见 `00` 第 8 节）。
 
 ## 文档
 
+### 第一组 · 治理（已定稿）
+
 | 文档 | 内容 | 状态 |
 |---|---|---|
-| [01-统一契约.md](01-统一契约.md) | `CredentialItem` / `BackendAdapter` 接口定义，来源标记策略 | 待写 |
-| [02-KeePassRPC适配器.md](02-KeePassRPC适配器.md) | 配对流程、NaCl 加密、六个 action、代理与权限 | 待写 |
-| [03-Bitwarden适配器.md](03-Bitwarden适配器.md) | SDK 集成、登录/2FA、sync、组织密钥、base URL 切换 | 待写 |
-| [04-填充引擎.md](04-填充引擎.md) | 表单识别、字段映射、TOTP、Shadow DOM | 待写 |
-| [05-锁定与安全.md](05-锁定与安全.md) | 会话密钥生命周期、锁定时机、MV3 service worker 约束 | 待写 |
+| [00-项目章程.md](00-项目章程.md) | 使命、场景、in/out of scope、Vaultix 边界、成功标准、待决事项、决策记录 | ✅ |
+| [01-开发硬性规约.md](01-开发硬性规约.md) | M 平台 / S 安全 / L 许可证 / C 契约，四系列红线 | ✅ |
+| [02-工程规范与门禁.md](02-工程规范与门禁.md) | E 目录 / T 测试 / G 七门禁 / D 文档 / V 提交 | ✅ |
+
+### 第二组 · 技术契约（待写）
+
+| 文档 | 内容 | 状态 |
+|---|---|---|
+| [03-统一契约.md](03-统一契约.md) | `CredentialItem` / `BackendAdapter` 接口、source 标记、capabilities | 待写 |
+| [04-KeePassRPC适配器.md](04-KeePassRPC适配器.md) | 配对流程、NaCl 加密、六个 action、代理与权限 | 待写 |
+| [05-Bitwarden适配器.md](05-Bitwarden适配器.md) | SDK 集成、登录/2FA、sync、组织密钥、base URL 切换 | 待写 |
+| [06-填充引擎.md](06-填充引擎.md) | 表单识别、字段映射、TOTP、Shadow DOM | 待写 |
+| [07-锁定与安全.md](07-锁定与安全.md) | 会话密钥生命周期、锁定时机、MV3 service worker 约束 | 待写 |
 
 ## 决策记录
 
-重大选择以"问题 → 选项 → 结论 → 理由"四段记录，追加到对应文档末尾，不单开文件。
+重大选择以"问题 → 选项 → 结论 → 理由"四段记录，**追加到对应文档末尾，不单开文件**。
+已归档决策见 `00-项目章程.md` 末尾（DEC-001 ~ DEC-004）。
