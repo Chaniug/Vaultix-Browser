@@ -1,0 +1,15 @@
+# 依赖
+node_modules/
+
+# 编译中间产物（测试用 TS 编译输出）
+.test-build/
+
+# 扩展打包产物（P1 起由构建脚本生成）
+dist/
+*.zip
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -49,7 +49,7 @@ Vaultix 管住了手机，但网页登录仍要依赖别的插件。本项目把
 | 阶段 | 内容 | 状态 |
 |---|---|---|
 | P-1 | 立规约：范围、红线、七道 CI 门禁 | ✅ 完成 |
-| P0 | 定义 `CredentialItem` / `BackendAdapter` 契约，不涉及后端 | 待开始 |
+| P0 | 定义 `CredentialItem` / `BackendAdapter` 契约，不涉及后端 | ✅ 完成（G1/G3 通过） |
 | P1 | 接通 KeePassRPC（associate → get-logins → get-totp），验证填充 | 待开始 |
 | P2 | 接通 Bitwarden（登录 → sync → 解密 → 只读列表），覆盖官方云与自建 | 待开始 |
 | P3 | 双源合并搜索、来源标记、冲突选择、锁定策略 | 待开始 |

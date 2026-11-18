@@ -1,0 +1,15 @@
+{
+  "name": "vaultix-browser",
+  "version": "0.1.0",
+  "private": true,
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "description": "Vaultix browser extension: unified credential filler for Bitwarden and KeePassXC",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test:core": "tsc --noEmit false --outDir .test-build --declaration false && node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
