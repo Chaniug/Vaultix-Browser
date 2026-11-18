@@ -11,13 +11,7 @@ export type BackendSource = 'bitwarden' | 'keepassxc';
 export const BACKEND_SOURCES = ['bitwarden', 'keepassxc'] as const;
 
 /** URI 匹配策略，对齐 Bitwarden 的 UriMatchType 语义 */
-export type UriMatchType =
-  | 'domain'
-  | 'host'
-  | 'exact'
-  | 'startsWith'
-  | 'regex'
-  | 'never';
+export type UriMatchType = 'domain' | 'host' | 'exact' | 'startsWith' | 'regex' | 'never';
 
 /** Bitwarden 自定义字段类型 */
 export type CustomFieldType = 'text' | 'hidden' | 'boolean' | 'linked';
