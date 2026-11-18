@@ -80,3 +80,16 @@ export function observeFields(root: ParentNode & Node, onChange: () => void): Mu
   });
   return observer;
 }
+
+/** 从表单中提取保存候选；只读取用户已输入的值，不写入页面（S-4） */
+export function collectSaveCandidate(form: HTMLFormElement): {
+  readonly url: string;
+  readonly username: string;
+  readonly password: string;
+} | null {
+  const fields = detectFields(form);
+  const password = fields.find((field) => field.kind === 'password')?.element.value;
+  const username = fields.find((field) => field.kind === 'username')?.element.value;
+  if (!password || !username) return null;
+  return { url: location.href, username, password };
+}

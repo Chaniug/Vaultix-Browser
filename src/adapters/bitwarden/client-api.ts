@@ -37,9 +37,10 @@ export interface ClientApiOptions {
 }
 
 interface RequestOptions {
-  readonly method?: 'GET' | 'POST';
+  readonly method?: 'GET' | 'POST' | 'PUT';
   readonly token?: string;
   readonly form?: Record<string, string>;
+  readonly json?: Record<string, unknown>;
 }
 
 export class BitwardenClient {
@@ -120,6 +121,26 @@ export class BitwardenClient {
     };
   }
 
+  /** 新建 Cipher。body 为已加密字段的 JSON 对象 */
+  async createCipher(token: string, body: Record<string, unknown>): Promise<{ id: string }> {
+    const data = await this.requestJson<Record<string, unknown>>(
+      `${this.endpoints.apiBase}/api/ciphers`,
+      { method: 'POST', token, json: body },
+    );
+    if (typeof data.id !== 'string') {
+      throw new VaultixError(ERROR_CODES.UNKNOWN);
+    }
+    return { id: data.id };
+  }
+
+  /** 更新已有 Cipher（PUT 全量替换） */
+  async updateCipher(token: string, id: string, body: Record<string, unknown>): Promise<void> {
+    await this.requestJson<Record<string, unknown>>(
+      `${this.endpoints.apiBase}/api/ciphers/${encodeURIComponent(id)}`,
+      { method: 'PUT', token, json: body },
+    );
+  }
+
   private deviceFields(): Record<string, string> {
     return {
       deviceType: '8',
@@ -165,6 +186,9 @@ export class BitwardenClient {
       if (options.form) {
         headers['Content-Type'] = 'application/x-www-form-urlencoded';
         body = new URLSearchParams(options.form).toString();
+      } else if (options.json) {
+        headers['Content-Type'] = 'application/json';
+        body = JSON.stringify(options.json);
       }
       const response = await fetch(url, {
         method: options.method ?? 'GET',

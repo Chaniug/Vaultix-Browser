@@ -1,5 +1,5 @@
 /**
- * KeePassRPC 适配器：associate → get-logins → get-totp。
+ * KeePassRPC 适配器：associate → get-logins → get-totp；P4 起支持 set-login（DEC-010）。
  *
  * 协议依据公开文档实现（L-3），不复制上游源码。
  * 设计纪律：search / listAll 不向调用方抛异常；所有错误收敛为错误码（S-2）。
@@ -7,7 +7,9 @@
 import type {
   BackendAdapter,
   BackendCapabilities,
+  CredentialDraft,
   CredentialItem,
+  SaveResult,
   SearchQuery,
 } from '../../core/types.js';
 import { bytesToBase64 } from '../../shared/encoding.js';
@@ -47,7 +49,7 @@ const CAPABILITIES: BackendCapabilities = {
   totp: true,
   customFields: false,
   uriMatching: false,
-  write: false,
+  write: true,
 };
 
 interface SessionState {
@@ -202,6 +204,60 @@ export class KeePassRpcAdapter implements BackendAdapter {
         code: toErrorCode(error),
       });
       return undefined;
+    }
+  }
+
+  /**
+   * 写回凭证（DEC-010）：set-login 新建（uuid 为空）或更新（带 uuid）。
+   * 按公开协议发送，不复制上游源码（L-3）。
+   */
+  async save(draft: CredentialDraft): Promise<SaveResult> {
+    const started = Date.now();
+    try {
+      if (!this.isReady()) {
+        throw new Error('adapter not ready');
+      }
+      const association = this.state.association;
+      if (!association) throw new Error('association required');
+
+      const payload: Record<string, unknown> = {
+        action: 'set-login',
+        url: draft.url,
+        login: draft.username,
+        password: draft.password,
+        id: association.id,
+      };
+      if (draft.uuid !== undefined && draft.uuid.length > 0) {
+        payload.uuid = draft.uuid;
+      }
+      if (draft.folder !== undefined && draft.folder.length > 0) {
+        payload.group = draft.folder;
+      }
+      // 协议文档中的可选字段，空串表示不指定
+      payload.submitUrl = '';
+      payload.groupUuid = '';
+      payload.downloadFavicon = 'false';
+
+      const response = await this.call('set-login', payload);
+      const created = draft.uuid === undefined || draft.uuid.length === 0;
+      const returnedUuid = typeof response.uuid === 'string' ? response.uuid : undefined;
+      logDebug('keepassrpc.save', {
+        backend: 'keepassxc',
+        ok: true,
+        durationMs: Date.now() - started,
+      });
+      return {
+        ok: true,
+        source: 'keepassxc',
+        ...(returnedUuid !== undefined ? { id: returnedUuid } : {}),
+        created,
+      };
+    } catch (error) {
+      logWarn('keepassrpc.save.failed', {
+        backend: 'keepassxc',
+        code: toErrorCode(error),
+      });
+      return { ok: false, source: 'keepassxc' };
     }
   }
 

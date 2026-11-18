@@ -1,14 +1,16 @@
 /**
- * Bitwarden 适配器：登录 → sync → 解密 → 只读列表/搜索。
+ * Bitwarden 适配器：登录 → sync → 解密 → 列表/搜索；P4 起支持写回（DEC-010）。
  * 官方云与 Vaultwarden 共用本实现，仅 endpoints 不同（DEC-002 / T-2）。
  */
 import type {
   BackendAdapter,
   BackendCapabilities,
+  CredentialDraft,
   CredentialItem,
   CredentialUri,
   CustomField,
   CustomFieldType,
+  SaveResult,
   SearchQuery,
   UriMatchType,
 } from '../../core/types.js';
@@ -22,6 +24,7 @@ import {
   decryptSymmetricKey,
   deriveMasterKey,
   deriveStretchedKey,
+  encryptCipherString,
 } from './crypto.js';
 import type { BitwardenConfig, Cipher, TokenResponse } from './types.js';
 
@@ -31,7 +34,7 @@ const CAPABILITIES: BackendCapabilities = {
   totp: true,
   customFields: true,
   uriMatching: true,
-  write: false,
+  write: true,
 };
 
 interface Session {
@@ -213,6 +216,59 @@ export class BitwardenAdapter implements BackendAdapter {
     this.cache = null;
   }
 
+  /** 写回凭证（DEC-010）：新建或更新 Cipher；失败收敛为 ok:false，不抛异常 */
+  async save(draft: CredentialDraft): Promise<SaveResult> {
+    const started = Date.now();
+    try {
+      const session = this.session;
+      if (!session) throw new VaultixError(ERROR_CODES.BACKEND_NOT_READY);
+      const key = session.symmetricKey;
+
+      const hostname = safeHostname(draft.url);
+      const name = await encryptCipherString(draft.name ?? hostname, key);
+      const uri = await encryptCipherString(draft.url, key);
+      const username = await encryptCipherString(draft.username, key);
+      const password = await encryptCipherString(draft.password, key);
+
+      const body: Record<string, unknown> = {
+        type: 1,
+        name,
+        login: { uris: [{ uri, match: null }], username, password },
+        notes: null,
+        fields: [],
+        folderId: null,
+        organizationId: null,
+      };
+      const updateId = draft.uuid !== undefined && draft.uuid.length > 0 ? draft.uuid : null;
+      if (updateId !== null) {
+        body.id = updateId;
+        await this.client.updateCipher(session.token, updateId, body);
+      } else {
+        const created = await this.client.createCipher(session.token, body);
+        this.cache = null;
+        return {
+          ok: true,
+          source: 'bitwarden',
+          id: created.id,
+          created: true,
+        };
+      }
+      this.cache = null;
+      logDebug('bitwarden.save', {
+        backend: 'bitwarden',
+        ok: true,
+        durationMs: Date.now() - started,
+      });
+      return { ok: true, source: 'bitwarden', id: updateId, created: false };
+    } catch (error) {
+      logWarn('bitwarden.save.failed', {
+        backend: 'bitwarden',
+        code: toErrorCode(error),
+      });
+      return { ok: false, source: 'bitwarden' };
+    }
+  }
+
   private async allItems(): Promise<readonly CredentialItem[]> {
     const ciphers = await this.getCiphers();
     const session = this.session;
@@ -318,4 +374,12 @@ async function decryptText(value: string | null | undefined, key: Uint8Array): P
   const text = asNonEmptyString(value);
   if (text === undefined) return '';
   return decryptCipherString(text, key);
+}
+
+function safeHostname(url: string): string {
+  try {
+    return new URL(url).hostname || 'Untitled';
+  } catch {
+    return 'Untitled';
+  }
 }

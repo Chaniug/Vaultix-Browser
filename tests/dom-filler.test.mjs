@@ -23,6 +23,7 @@ beforeEach(() => {
   globalThis.HTMLInputElement = dom.window.HTMLInputElement;
   globalThis.NodeFilter = dom.window.NodeFilter;
   globalThis.Event = dom.window.Event;
+  globalThis.location = dom.window.location;
   globalThis.MutationObserver = dom.window.MutationObserver;
 });
 
@@ -90,4 +91,18 @@ test('填充只写 value 与派发事件，不写入页面可读属性', () => {
     assert.equal(field.element.hasAttribute('data-password'), false);
     assert.equal(field.element.hasAttribute('value'), false);
   }
+});
+
+test('表单提交时采集保存候选（不写入页面）', async () => {
+  const { collectSaveCandidate } = await import('../.test-build/src/content/detector.js');
+  const form = document.getElementById('login');
+  form.querySelector('#username').value = 'alice';
+  form.querySelector('#password').value = 'new-pass';
+  const candidate = collectSaveCandidate(form);
+  assert.equal(candidate.username, 'alice');
+  assert.equal(candidate.password, 'new-pass');
+  assert.equal(typeof candidate.url, 'string');
+
+  form.querySelector('#password').value = '';
+  assert.equal(collectSaveCandidate(form), null);
 });
