@@ -38,5 +38,7 @@ await cp(join(root, 'manifest.json'), join(dist, 'manifest.json'));
 for (const html of ['popup.html', 'options.html', 'offscreen.html']) {
   await cp(join(root, 'ui', html), join(dist, 'ui', html));
 }
+await cp(join(root, 'ui', 'shared.css'), join(dist, 'ui', 'shared.css'));
+await cp(join(root, 'icons'), join(dist, 'icons'), { recursive: true });
 
 console.log(`build ok: ${dist}`);

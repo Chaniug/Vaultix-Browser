@@ -18,3 +18,6 @@ Thumbs.db
 # CRX 签名私钥（勿提交）
 *.pem
 *.crx
+
+# 商店截图临时预览页
+store-assets/.preview/

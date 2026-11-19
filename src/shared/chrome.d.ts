@@ -36,6 +36,7 @@ interface ChromeRuntime {
   readonly lastError?: { readonly message: string };
   connectNative(application: string): ChromePort;
   sendMessage(message: ChromeMessage): Promise<ChromeMessage>;
+  openOptionsPage(): Promise<void>;
   onMessage: {
     addListener(
       cb: (

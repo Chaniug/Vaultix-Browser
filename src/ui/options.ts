@@ -47,30 +47,52 @@ async function load(): Promise<void> {
   }
 }
 
+let toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+function toast(text: string, error = false): void {
+  const el = byId('saved');
+  if (toastTimer !== null) clearTimeout(toastTimer);
+  el.textContent = text;
+  el.className = error ? 'toast show error' : 'toast show';
+  toastTimer = setTimeout(() => {
+    el.className = 'toast';
+    el.textContent = '';
+    toastTimer = null;
+  }, 2600);
+}
+
 async function save(): Promise<void> {
   const mode = valueOf('mode') === 'vaultwarden' ? 'vaultwarden' : 'bitwarden.cloud';
   const backgroundMinutes = Number(valueOf('background-lock')) || 5;
   const idleMinutes = Number(valueOf('idle-lock')) || 15;
-  await chrome.storage.local.set({
-    serverUrl: valueOf('server-url'),
-    mode,
-    email: valueOf('email'),
-    defaultSaveSource: valueOf('default-save-source') === 'keepassxc' ? 'keepassxc' : 'bitwarden',
-    lockPolicy: {
-      backgroundLockMs: backgroundMinutes * 60_000,
-      idleLockMs: idleMinutes * 60_000,
-    },
-  });
-  byId('saved').textContent = STRINGS.saved;
+  try {
+    await chrome.storage.local.set({
+      serverUrl: valueOf('server-url'),
+      mode,
+      email: valueOf('email'),
+      defaultSaveSource: valueOf('default-save-source') === 'keepassxc' ? 'keepassxc' : 'bitwarden',
+      lockPolicy: {
+        backgroundLockMs: backgroundMinutes * 60_000,
+        idleLockMs: idleMinutes * 60_000,
+      },
+    });
+    toast(STRINGS.saved);
+  } catch {
+    toast('保存失败', true);
+  }
 }
 
 async function associate(): Promise<void> {
-  const result = (await chrome.runtime.sendMessage({ type: MSG.ASSOCIATE })) as {
-    ok: boolean;
-  };
-  byId('association-status').textContent = result.ok
-    ? '配对成功'
-    : '配对失败，请确认 KeePassXC 已运行';
+  const statusEl = byId('association-status');
+  statusEl.textContent = '正在配对…';
+  try {
+    const result = (await chrome.runtime.sendMessage({ type: MSG.ASSOCIATE })) as {
+      ok: boolean;
+    };
+    statusEl.textContent = result.ok ? '✓ 配对成功' : '配对失败，请确认 KeePassXC 已运行并允许连接';
+  } catch {
+    statusEl.textContent = '配对失败，请确认 KeePassXC 已运行';
+  }
 }
 
 byId('save').addEventListener('click', () => {
