@@ -7,9 +7,17 @@ node_modules/
 # 扩展打包产物（P1 起由构建脚本生成）
 dist/
 *.zip
+coverage/
 
 # 编辑器 / 系统
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+
+# CRX 签名私钥（勿提交）
+*.pem
+*.crx
+
+# 商店截图临时预览页
+store-assets/.preview/

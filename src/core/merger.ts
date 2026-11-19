@@ -7,21 +7,13 @@
  * 纯函数，无浏览器 API 依赖，便于单测（T-1 测试向量）。
  */
 
-import type {
-  BackendAdapter,
-  BackendSource,
-  CredentialItem,
-  SearchQuery,
-} from './types.js';
+import type { BackendAdapter, BackendSource, CredentialItem, SearchQuery } from './types.js';
 
 /** 用户可配置的来源优先级，靠前者优先 */
 export type SourcePriority = readonly BackendSource[];
 
 /** D-02 推荐默认：Bitwarden 优先，KeePassXC 次之 */
-export const DEFAULT_SOURCE_PRIORITY: SourcePriority = [
-  'bitwarden',
-  'keepassxc',
-] as const;
+export const DEFAULT_SOURCE_PRIORITY: SourcePriority = ['bitwarden', 'keepassxc'] as const;
 
 export interface MergeResult {
   /** 按优先级排序后的全部命中 */
@@ -45,9 +37,7 @@ export async function searchAcrossBackends(
   query: SearchQuery,
   priority: SourcePriority = DEFAULT_SOURCE_PRIORITY,
 ): Promise<MergeResult> {
-  const rank = new Map<BackendSource, number>(
-    priority.map((source, index) => [source, index]),
-  );
+  const rank = new Map<BackendSource, number>(priority.map((source, index) => [source, index]));
 
   const buckets = await Promise.all(
     adapters.map(async (adapter) => {
@@ -78,7 +68,6 @@ export async function searchAcrossBackends(
     return rankA - rankB;
   });
 
-  const hitSources = [...hitsBySource.values()].filter((count) => count > 0)
-    .length;
+  const hitSources = [...hitsBySource.values()].filter((count) => count > 0).length;
   return { items, ambiguous: hitSources > 1 };
 }

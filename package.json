@@ -7,9 +7,31 @@
   "description": "Vaultix browser extension: unified credential filler for Bitwarden and KeePassXC",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test:core": "tsc --noEmit false --outDir .test-build --declaration false && node --test tests/*.test.mjs"
+    "compile:test": "tsc -p tsconfig.test.json",
+    "test": "node --test tests/*.test.mjs",
+    "test:core": "npm run compile:test && npm run test",
+    "lint": "eslint src tests",
+    "format:check": "prettier --check \"src/**/*.ts\" \"tests/*.mjs\" \"scripts/*.mjs\" \"*.mjs\" \"*.json\"",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/*.mjs\" \"scripts/*.mjs\" \"*.mjs\" \"*.json\"",
+    "build": "node scripts/build.mjs",
+    "gate:g1": "npm run typecheck",
+    "gate:g2": "npm run lint && npm run format:check",
+    "gate:g3": "npm run test:core",
+    "gate:g4": "node scripts/security-scan.mjs",
+    "gate:g5": "node scripts/license-check.mjs",
+    "gate:g6": "npm run build && node scripts/artifact-check.mjs",
+    "gate:g7": "npm run test:core && node --test tests/dom-*.test.mjs"
+  },
+  "dependencies": {
+    "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
-    "typescript": "^5.7.0"
+    "@types/node": "^22.13.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^9.19.0",
+    "jsdom": "^26.0.0",
+    "prettier": "^3.5.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.22.0"
   }
 }

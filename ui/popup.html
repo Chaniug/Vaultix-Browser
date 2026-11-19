@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vaultix Browser</title>
+    <link rel="stylesheet" href="shared.css" />
+  </head>
+  <body class="popup">
+    <div class="popup-shell">
+      <header class="popup-header">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="4" y="10" width="16" height="11" rx="2" />
+              <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+              <circle cx="12" cy="15.5" r="1.4" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+          <span class="brand-text">
+            <strong>Vaultix</strong>
+            <small>一个入口，两个密码库</small>
+          </span>
+        </div>
+        <button
+          id="open-options"
+          class="icon-btn"
+          type="button"
+          title="打开设置"
+          aria-label="打开设置"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.64 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.64 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.64a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.64a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.36 9v.01A1.7 1.7 0 0 0 20.92 10H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1Z"
+            />
+          </svg>
+        </button>
+      </header>
+
+      <div class="status-card">
+        <span id="status-dot" class="status-dot" aria-hidden="true"></span>
+        <span id="status">检查状态中…</span>
+        <span class="status-spacer"></span>
+        <button id="lock" class="chip-btn" type="button">锁定</button>
+      </div>
+
+      <section id="unlock-panel" class="unlock-panel" hidden>
+        <label class="field">
+          <span>主密码 <em>仅内存态，不保存</em></span>
+          <input
+            id="master-password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="输入密码库主密码"
+          />
+        </label>
+        <label class="field">
+          <span>两步验证码 <em>如需要</em></span>
+          <input
+            id="two-factor"
+            type="text"
+            autocomplete="one-time-code"
+            inputmode="numeric"
+            placeholder="可选"
+          />
+        </label>
+        <button id="unlock" class="primary-btn" type="button">解锁凭证库</button>
+        <p class="security-note">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="4" y="10" width="16" height="11" rx="2" />
+            <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+          </svg>
+          主密码与派生密钥只存在于内存，不写入磁盘；浏览器重启后需重新解锁。
+        </p>
+      </section>
+
+      <div id="context-row" class="context-row" hidden>
+        <span>当前站点</span>
+        <span id="site-host" class="context-host"></span>
+      </div>
+
+      <main id="results" class="results" aria-live="polite"></main>
+
+      <footer class="popup-footer">
+        <span>Bitwarden · KeePassXC</span>
+        <span>本地处理 · 不上传凭证</span>
+      </footer>
+    </div>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

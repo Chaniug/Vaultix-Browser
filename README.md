@@ -5,7 +5,7 @@
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 [![Manifest](https://img.shields.io/badge/Manifest-V3-orange.svg)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
-[![Status](https://img.shields.io/badge/Status-设计中-yellow.svg)](#路线图)
+[![Status](https://img.shields.io/badge/Status-P4%20完成-brightgreen.svg)](#路线图)
 
 ---
 
@@ -50,9 +50,27 @@ Vaultix 管住了手机，但网页登录仍要依赖别的插件。本项目把
 |---|---|---|
 | P-1 | 立规约：范围、红线、七道 CI 门禁 | ✅ 完成 |
 | P0 | 定义 `CredentialItem` / `BackendAdapter` 契约，不涉及后端 | ✅ 完成（G1/G3 通过） |
-| P1 | 接通 KeePassRPC（associate → get-logins → get-totp），验证填充 | 待开始 |
-| P2 | 接通 Bitwarden（登录 → sync → 解密 → 只读列表），覆盖官方云与自建 | 待开始 |
-| P3 | 双源合并搜索、来源标记、冲突选择、锁定策略 | 待开始 |
+| P1 | 接通 KeePassRPC（associate → get-logins → get-totp），验证填充 | ✅ 完成 |
+| P2 | 接通 Bitwarden（登录 → sync → 解密 → 只读列表），覆盖官方云与自建 | ✅ 完成 |
+| P3 | 双源合并搜索、来源标记、冲突选择、锁定策略 | ✅ 完成 |
+| P4 | 写回凭证（Bitwarden Cipher / KeePassRPC set-login）+ 保存提示，DEC-010 | ✅ 完成 |
+
+## 本地开发
+
+```bash
+npm ci
+npm run typecheck      # G1
+npm run lint           # G2（含 Prettier check）
+npm run test:core      # G3：协议 / 加密 / 合并 / 锁定单测
+npm run gate:g4        # G4：安全静态扫描
+npm run gate:g5        # G5：依赖许可证
+npm run gate:g6        # G6：构建 + 产物断言
+npm run gate:g7        # G7：DOM / 填充集成测试
+npm run build          # 产物在 dist/，Chrome 加载已解压的扩展即可
+```
+
+首次使用：在设置页填写 Bitwarden 服务地址与邮箱并解锁；KeePassXC 需安装 keepassxc-proxy
+并在 KeePassXC 浏览器集成设置中允许本扩展，再点击"配对 KeePassXC"。
 
 ## 相关项目
 
@@ -60,6 +78,12 @@ Vaultix 管住了手机，但网页登录仍要依赖别的插件。本项目把
 - [bw2keepass](https://github.com/Chaniug/bw2keepass) — Bitwarden / KDBX 格式互转，本项目的加密格式知识来源
 - [KeePassXC-Browser](https://github.com/keepassxreboot/keepassxc-browser) — KeePassRPC 协议参考（GPL-3.0）
 - [bitwarden/clients](https://github.com/bitwarden/clients) — 官方客户端与 SDK（GPL-3.0）
+
+## 应用商店素材
+
+- `store-assets/`：图标、1280×800 截图、宣传图与上架文案（`LISTING.md`）。
+- 用 `python3 scripts/generate-icons.py` 重新生成图标，`python3 scripts/make-screenshots.py` 重新生成截图。
+- 隐私政策页面为 `docs/privacy.html`，通过 GitHub Pages（来源 `/docs`）公开。
 
 ## 许可
 

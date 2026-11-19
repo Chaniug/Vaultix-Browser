@@ -4,7 +4,8 @@
 
 ## 当前状态
 
-- **P0 已完成**（2026-11-18）：统一契约落地为可编译类型，G1 编译 + G3 单测（5/5）通过。
+- **P0~P3 已完成**（2026-11-19）：统一契约、KeePassRPC 适配器、Bitwarden 适配器、填充引擎、锁定策略与 MV3 扩展骨架全部落地。
+- 门禁：G1~G7 均可单独运行且全绿（`npm run gate:g1` … `npm run gate:g7`）。
 - 已确认的硬约束：
   - **许可证**：上游 KeePassXC-Browser 与 bitwarden/clients 均为 GPL-3.0 → 本项目同协议。
   - **后端形态**：KDBX 不在扩展内解密（走 KeePassRPC）；Bitwarden 官方云与 Vaultwarden 共用 Client API，仅 base URL 不同。
@@ -26,12 +27,18 @@
 | 文档 | 内容 | 状态 |
 |---|---|---|
 | [03-统一契约.md](03-统一契约.md) | `CredentialItem` / `BackendAdapter` 接口、source 标记、capabilities | ✅ |
-| [04-KeePassRPC适配器.md](04-KeePassRPC适配器.md) | 配对流程、NaCl 加密、六个 action、代理与权限 | 待写 |
-| [05-Bitwarden适配器.md](05-Bitwarden适配器.md) | SDK 集成、登录/2FA、sync、组织密钥、base URL 切换 | 待写 |
-| [06-填充引擎.md](06-填充引擎.md) | 表单识别、字段映射、TOTP、Shadow DOM | 待写 |
-| [07-锁定与安全.md](07-锁定与安全.md) | 会话密钥生命周期、锁定时机、MV3 service worker 约束 | 待写 |
+| [04-KeePassRPC适配器.md](04-KeePassRPC适配器.md) | 配对流程、NaCl 加密、线协议、能力声明 | ✅ |
+| [05-Bitwarden适配器.md](05-Bitwarden适配器.md) | 端点切换、登录/2FA、sync、解密链、URI 匹配 | ✅ |
+| [06-填充引擎.md](06-填充引擎.md) | 表单识别、字段映射、TOTP、Shadow DOM | ✅ |
+| [07-锁定与安全.md](07-锁定与安全.md) | 会话状态机、存储边界、剪贴板超时 | ✅ |
 
 ## 决策记录
 
 重大选择以"问题 → 选项 → 结论 → 理由"四段记录，**追加到对应文档末尾，不单开文件**。
-已归档决策：`00-项目章程.md`（DEC-001 ~ 004）、`03-统一契约.md`（DEC-005 ~ 007）。
+已归档决策：`00-项目章程.md`（DEC-001 ~ 004）、`03-统一契约.md`（DEC-005 ~ 007）、
+`04-KeePassRPC适配器.md`（DEC-008）、`05-Bitwarden适配器.md`（DEC-009）。
+
+### 第三组 · P4 写回（已完成，DEC-010 / DEC-011）
+
+写操作从原 out of scope 移出：Bitwarden Cipher 新建/更新、KeePassRPC set-login、
+表单提交保存提示；明文凭证只在内存流转，不落盘（S-1 不放宽）。决策记录见 `00` DEC-010 与 `03` DEC-011。

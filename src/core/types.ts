@@ -11,13 +11,7 @@ export type BackendSource = 'bitwarden' | 'keepassxc';
 export const BACKEND_SOURCES = ['bitwarden', 'keepassxc'] as const;
 
 /** URI 匹配策略，对齐 Bitwarden 的 UriMatchType 语义 */
-export type UriMatchType =
-  | 'domain'
-  | 'host'
-  | 'exact'
-  | 'startsWith'
-  | 'regex'
-  | 'never';
+export type UriMatchType = 'domain' | 'host' | 'exact' | 'startsWith' | 'regex' | 'never';
 
 /** Bitwarden 自定义字段类型 */
 export type CustomFieldType = 'text' | 'hidden' | 'boolean' | 'linked';
@@ -108,6 +102,33 @@ export interface SearchQuery {
 }
 
 /**
+ * 写回草稿（DEC-011）。只含用户可编辑字段；
+ * source / meta 等由后端分配的字段不在此处，防止来源伪造（S-6）。
+ */
+export interface CredentialDraft {
+  /** 凭证关联的站点 URL */
+  readonly url: string;
+  readonly username: string;
+  readonly password: string;
+  /** 条目显示名；缺省时由适配器按域名生成 */
+  readonly name?: string;
+  /** 已有条目标识；有值时为更新，否则新建 */
+  readonly uuid?: string;
+  /** KeePassXC 分组路径；Bitwarden 忽略 */
+  readonly folder?: string;
+}
+
+/** 写回结果。来源由适配器写入，UI 只读（S-6） */
+export interface SaveResult {
+  readonly ok: boolean;
+  readonly source: BackendSource;
+  /** 后端分配的条目 ID；失败时缺省 */
+  readonly id?: string;
+  /** true = 新建，false = 更新 */
+  readonly created?: boolean;
+}
+
+/**
  * 后端适配器接口 —— 双源一抽象的物理边界。
  *
  * 实现方：adapters/bitwarden 与 adapters/keepassrpc。
@@ -131,4 +152,10 @@ export interface BackendAdapter {
 
   /** 列出全部条目。能力不支持时返回空数组 */
   listAll(): Promise<readonly CredentialItem[]>;
+
+  /**
+   * 写回凭证（P4 / DEC-010）。能力不支持时必须返回 ok:false，不得抛异常到调用方。
+   * 调用方必须已获得用户确认；明文只在内存流转，禁止写盘（S-1）。
+   */
+  save(draft: CredentialDraft): Promise<SaveResult>;
 }

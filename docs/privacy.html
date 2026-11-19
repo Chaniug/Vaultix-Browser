@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vaultix Browser 隐私政策</title>
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui, -apple-system, "PingFang SC", sans-serif; }
+      body { max-width: 760px; margin: 40px auto; padding: 0 20px 60px; line-height: 1.75; }
+      h1 { font-size: 26px; margin-bottom: 4px; }
+      h2 { font-size: 17px; margin-top: 30px; padding-bottom: 6px; border-bottom: 1px solid #8884; }
+      p, li { font-size: 14px; }
+      code { padding: 1px 5px; border-radius: 4px; background: #8882; }
+      .meta { color: #888; font-size: 13px; margin-bottom: 28px; }
+      .callout { padding: 12px 16px; border-left: 3px solid #2fc79d; background: #2fc79d12; border-radius: 0 8px 8px 0; }
+    </style>
+  </head>
+  <body>
+    <h1>Vaultix Browser 隐私政策</h1>
+    <p class="meta">生效日期：2026-11-19 · 最近更新：2026-11-19</p>
+
+    <div class="callout">
+      <strong>一句话版本：</strong>这个扩展不收集你的数据、不做统计、不投放广告，也不会把凭证发到我们控制的任何服务器。
+      它只是把你已有的 Bitwarden / Vaultwarden 与 KeePassXC 密码库接到浏览器表单上。
+    </div>
+
+    <h2>1. 我们是谁、这个扩展做什么</h2>
+    <p>
+      Vaultix Browser（以下简称"本扩展"）是一个本地运行的浏览器凭证填充器。它的唯一用途是：
+      在浏览器中查找、填充和保存你自己的密码库条目。项目源码公开于
+      <a href="https://github.com/Chaniug/Vaultix-Browser">GitHub 仓库</a>。
+      本扩展由个人开发者维护，不隶属于 Bitwarden 或 KeePassXC 项目。
+    </p>
+
+    <h2>2. 我们收集哪些数据</h2>
+    <p><strong>我们不收集、不上传、不分享任何个人数据给第三方。</strong>本扩展没有账号系统、没有统计 SDK、没有广告、没有远程配置。具体说明：</p>
+    <ul>
+      <li><strong>主密码</strong>：只在内存中用于派生密钥，绝不写入磁盘、绝不上传到任何服务器、绝不写入日志。</li>
+      <li><strong>明文凭证</strong>：仅在浏览器扩展进程的内存中流转，用于填充表单或写回你自己的密码库；不落盘、不出现在日志。</li>
+      <li><strong>会话数据</strong>：临时会话令牌与解密结果保存在 <code>chrome.storage.session</code>（内存态，关闭浏览器即失效）。</li>
+      <li><strong>本地配置</strong>：服务地址、邮箱、锁定时间、默认保存目标等非敏感设置保存在 <code>chrome.storage.local</code>，仅存于你这台设备。</li>
+      <li><strong>页面信息</strong>：内容脚本只在需要填充/保存时读取当前页面表单的字段类型和已输入的值，并通过扩展内部消息传给后台进程；不发送给任何外部服务器，也不记录访问历史。</li>
+    </ul>
+
+    <h2>3. 数据发送到哪里</h2>
+    <ul>
+      <li><strong>Bitwarden / Vaultwarden</strong>：仅与你自己在设置页配置的服务地址通信，用于登录、同步和写回凭证。请求内容按 Bitwarden 协议加密，请求体不含明文密码。</li>
+      <li><strong>KeePassXC</strong>：通过本机 <code>keepassxc-proxy</code> 以 Native Messaging 与本机的 KeePassXC 通信，不经过网络。</li>
+      <li><strong>无其他目的地</strong>：本扩展没有analytics端点、遥测、崩溃上报或远程日志。</li>
+    </ul>
+
+    <h2>4. 权限说明</h2>
+    <ul>
+      <li><code>activeTab</code> / <code>scripting</code>：仅在你点击扩展图标后，向当前标签页注入填充脚本。</li>
+      <li><code>storage</code>：保存上述本地非敏感配置与内存会话态。</li>
+      <li><code>optional_host_permissions</code>：对 Bitwarden 服务地址与当前站点按需申请，用于发起 API 请求和注入脚本；不会在安装时一次性索取全部站点权限。</li>
+      <li><code>nativeMessaging</code>：连接本机 KeePassXC 代理。</li>
+      <li><code>clipboardWrite</code>：在你点击"复制密码"时写入剪贴板，并在 30 秒后自动清空。</li>
+      <li><code>contextMenus</code> / <code>notifications</code> / <code>offscreen</code>：提供右键菜单、状态提示与剪贴板超时清理。</li>
+    </ul>
+
+    <h2>5. 安全设计</h2>
+    <p>
+      明文凭证与主密码永不写入磁盘；会话态不跨浏览器重启保留；日志只输出错误码和脱敏后的域名（eTLD+1），
+      不输出完整 URL、查询参数、用户名、令牌或密码。内容脚本与页面上下文隔离，页面脚本无法读取扩展内存中的凭证。
+    </p>
+
+    <h2>6. 数据处理方式变更</h2>
+    <p>
+      若未来版本改变上述数据处理方式，我们会先更新本隐私政策，并在扩展更新说明中明确告知。
+      你也可以随时在 GitHub 仓库查看源码与提交记录，核对实际行为。
+    </p>
+
+    <h2>7. 你的选择</h2>
+    <p>
+      你可以随时在浏览器扩展管理页卸载本扩展；卸载后本地配置随扩展数据一并删除。
+      你密码库中的条目始终由你自己的密码库管理，本扩展不持有副本。
+    </p>
+
+    <h2>8. 联系方式</h2>
+    <p>
+      如有隐私相关问题，请通过
+      <a href="https://github.com/Chaniug/Vaultix-Browser/issues">GitHub Issues</a>
+      提交。我们不使用专属邮箱收集个人信息。
+    </p>
+  </body>
+</html>

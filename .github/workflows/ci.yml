@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # 七道门禁分开单跑，禁止串联：任一道失败时后续步骤状态仍然清晰
+      - name: G1 TypeScript
+        run: npm run gate:g1
+      - name: G2 ESLint + Prettier
+        run: npm run gate:g2
+      - name: G3 Unit tests
+        run: npm run gate:g3
+      - name: G4 Security scan
+        run: npm run gate:g4
+      - name: G5 License check
+        run: npm run gate:g5
+      - name: G6 Artifact check
+        run: npm run gate:g6
+      - name: G7 DOM integration
+        run: npm run gate:g7
