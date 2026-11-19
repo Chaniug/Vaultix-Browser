@@ -25,6 +25,10 @@ export const STRINGS = {
   ambiguous: '两个密码库都命中了，默认使用优先级更高的来源',
   backgroundLock: '后台锁定（分钟）',
   idleLock: '空闲锁定（分钟）',
-  savePrompt: '保存新密码？',
+  savePrompt: '发现新密码，是否保存？',
   saveTo: '保存到',
+  cancel: '取消',
+  lockedHint: '解锁后可查看当前站点的凭证',
+  suspendedHint: '会话已过期，请重新解锁',
+  noTab: '无法读取当前标签页',
 } as const;

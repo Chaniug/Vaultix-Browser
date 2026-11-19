@@ -2,9 +2,16 @@
   "manifest_version": 3,
   "name": "Vaultix Browser",
   "version": "0.1.0",
-  "description": "一个入口，取用 Bitwarden 系与 KeePassXC 两类密码库的凭证（只读填充）。",
+  "description": "统一填充 Bitwarden/Vaultwarden 与 KeePassXC：一键取用凭证、安全写回新密码，主密码永不落盘。",
   "license": "GPL-3.0-only",
+  "homepage_url": "https://github.com/Chaniug/Vaultix-Browser",
   "minimum_chrome_version": "116",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "permissions": [
     "activeTab",
     "storage",
@@ -22,7 +29,13 @@
   },
   "action": {
     "default_title": "Vaultix Browser",
-    "default_popup": "ui/popup.html"
+    "default_popup": "ui/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
   },
   "options_ui": {
     "page": "ui/options.html",

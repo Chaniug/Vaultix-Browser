@@ -79,6 +79,12 @@ npm run build          # 产物在 dist/，Chrome 加载已解压的扩展即可
 - [KeePassXC-Browser](https://github.com/keepassxreboot/keepassxc-browser) — KeePassRPC 协议参考（GPL-3.0）
 - [bitwarden/clients](https://github.com/bitwarden/clients) — 官方客户端与 SDK（GPL-3.0）
 
+## 应用商店素材
+
+- `store-assets/`：图标、1280×800 截图、宣传图与上架文案（`LISTING.md`）。
+- 用 `python3 scripts/generate-icons.py` 重新生成图标，`python3 scripts/make-screenshots.py` 重新生成截图。
+- 隐私政策页面为 `docs/privacy.html`，通过 GitHub Pages（来源 `/docs`）公开。
+
 ## 许可
 
 [GPL-3.0](LICENSE) — 与 Vaultix 及上游依赖保持一致。

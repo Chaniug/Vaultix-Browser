@@ -64,7 +64,18 @@ const required = [
   `ui${sep}options.js`,
   `ui${sep}offscreen.html`,
   `ui${sep}offscreen.js`,
+  `ui${sep}shared.css`,
+  `icons${sep}icon-16.png`,
+  `icons${sep}icon-32.png`,
+  `icons${sep}icon-48.png`,
+  `icons${sep}icon-128.png`,
 ];
+for (const [size, path] of Object.entries(manifest.icons ?? {})) {
+  if (!(await stat(join(dist, path)).catch(() => null))) {
+    violations.push(`manifest.icons.${size} 指向的文件不存在: ${path}`);
+  }
+}
+if (!manifest.action?.default_icon) violations.push('缺少 action.default_icon');
 for (const item of required) {
   if (!(await stat(join(dist, item)).catch(() => null))) {
     violations.push(`缺少产物 ${item}`);
