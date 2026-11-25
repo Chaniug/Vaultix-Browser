@@ -23,7 +23,8 @@ import {
   decryptCipherString,
   decryptSymmetricKey,
   deriveMasterKey,
-  deriveStretchedKey,
+  hashMasterPassword,
+  stretchMasterKey,
   encryptCipherString,
 } from './crypto.js';
 import type { BitwardenConfig, Cipher, TokenResponse } from './types.js';
@@ -148,18 +149,16 @@ export class BitwardenAdapter implements BackendAdapter {
       const prelogin = await this.client.prelogin(email);
       const iterations = this.config.kdfIterations ?? prelogin.kdfIterations;
       const masterKey = await deriveMasterKey(email, masterPassword, iterations);
-      const stretchedKey = await deriveStretchedKey(masterKey, masterPassword, iterations);
-      const token = await this.client.loginWithPassword(
-        email,
-        bytesToBase64(stretchedKey),
-        this.config.twoFactorCode,
-      );
+      // 认证哈希：单轮 PBKDF2(masterKey, 主密码)；解封用户密钥：HKDF 拉伸的 enc/mac 密钥。
+      const authHash = await hashMasterPassword(masterKey, masterPassword);
+      const stretchedKey = await stretchMasterKey(masterKey);
+      const token = await this.client.loginWithPassword(email, authHash, this.config.twoFactorCode);
       const sync = await this.client.sync(token.access_token);
       const protectedKey = asNonEmptyString(sync.profile?.key);
       if (protectedKey === undefined) {
         throw new VaultixError(ERROR_CODES.DECRYPT_FAILED);
       }
-      const symmetricKey = await decryptSymmetricKey(protectedKey, masterKey);
+      const symmetricKey = await decryptSymmetricKey(protectedKey, stretchedKey);
       this.session = {
         token: token.access_token,
         ...(token.refresh_token !== undefined ? { refreshToken: token.refresh_token } : {}),

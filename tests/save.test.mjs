@@ -27,16 +27,31 @@ const PASSWORD = 'write-test-password';
 const ITER = 1000;
 const MASTER_KEY = await deriveMasterKey(EMAIL, PASSWORD, ITER);
 
+function hkdfExpand(prk, info) {
+  return nodeCrypto
+    .createHmac('sha256', prk)
+    .update(Buffer.concat([Buffer.from(info, 'utf8'), Buffer.from([0x01])]))
+    .digest();
+}
+
+function stretched(masterKey) {
+  return Buffer.concat([hkdfExpand(masterKey, 'enc'), hkdfExpand(masterKey, 'mac')]);
+}
+
 function symmetricKey() {
   return nodeCrypto.randomBytes(64);
 }
 
 function protectedKey(sym) {
+  const key = stretched(MASTER_KEY);
   const iv = nodeCrypto.randomBytes(16);
-  const cipher = nodeCrypto.createCipheriv('aes-256-cbc', MASTER_KEY.subarray(0, 32), iv);
-  return Buffer.concat([iv, Buffer.concat([cipher.update(sym), cipher.final()])]).toString(
-    'base64',
-  );
+  const cipher = nodeCrypto.createCipheriv('aes-256-cbc', key.subarray(0, 32), iv);
+  const ciphertext = Buffer.concat([cipher.update(sym), cipher.final()]);
+  const mac = nodeCrypto
+    .createHmac('sha256', key.subarray(32, 64))
+    .update(Buffer.concat([iv, ciphertext]))
+    .digest();
+  return `2.${iv.toString('base64')}|${ciphertext.toString('base64')}|${mac.toString('base64')}`;
 }
 
 function installSaveFetchStub(sym) {
@@ -77,12 +92,12 @@ test('encryptCipherString 与 decryptCipherString 往返一致', async () => {
   assert.equal(await decryptCipherString(encrypted, key), plain);
 
   // 篡改 HMAC 后必须解密失败
-  const parts = encrypted.split('.');
-  const mac = base64ToBytes(parts[3]);
+  const parts = encrypted.slice(2).split('|');
+  const mac = base64ToBytes(parts[2]);
   mac[0] ^= 0x01;
-  parts[3] = Buffer.from(mac).toString('base64');
+  parts[2] = Buffer.from(mac).toString('base64');
   await assert.rejects(
-    () => decryptCipherString(parts.join('.'), key),
+    () => decryptCipherString(`2.${parts.join('|')}`, key),
     (error) => error.code === 'DECRYPT_FAILED',
   );
 });
@@ -194,16 +209,18 @@ class SaveMockTransport {
       ...(request.action === 'associate' ? { id: 'save-client' } : {}),
       ...(request.action === 'set-login' ? { uuid: 'kp-entry-id' } : {}),
     };
+    // 与真实 KeePassXC 一致：服务端生成独立响应 nonce，并用它加密 message。
+    const responseNonce = nacl.randomBytes(24);
     const encrypted = nacl.box(
       utf8ToBytes(JSON.stringify(payload)),
-      nonce,
+      responseNonce,
       this.clientPublicKey,
       HOST_KEY.secretKey,
     );
     return {
       action: request.action,
       message: bytesToBase64(encrypted),
-      nonce: bytesToBase64(incrementNonce(nonce)),
+      nonce: bytesToBase64(responseNonce),
       clientID: message.clientID,
       success: 'true',
     };

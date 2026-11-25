@@ -15,6 +15,7 @@ for (const dir of ['background', 'content', 'ui']) {
 const entries = [
   { in: 'src/background/index.ts', out: 'background/service-worker.js', format: 'esm' },
   { in: 'src/content/index.ts', out: 'content/content.js', format: 'iife' },
+  { in: 'src/content/passkeys-page.ts', out: 'content/passkeys.js', format: 'iife' },
   { in: 'src/ui/popup.ts', out: 'ui/popup.js', format: 'esm' },
   { in: 'src/ui/options.ts', out: 'ui/options.js', format: 'esm' },
   { in: 'src/ui/offscreen.ts', out: 'ui/offscreen.js', format: 'esm' },

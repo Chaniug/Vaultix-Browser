@@ -106,3 +106,89 @@ test('表单提交时采集保存候选（不写入页面）', async () => {
   form.querySelector('#password').value = '';
   assert.equal(collectSaveCandidate(form), null);
 });
+
+test('只有 type="email" 的输入框也识别为账号框', () => {
+  const form = document.getElementById('login');
+  form.replaceChildren();
+  const email = document.createElement('input');
+  email.type = 'email';
+  const pass = document.createElement('input');
+  pass.type = 'password';
+  form.append(email, pass);
+  const fields = detectFields(document);
+  assert.deepEqual(
+    fields.map((field) => field.kind),
+    ['username', 'password'],
+  );
+  assert.equal(fields[0].element, email);
+});
+
+test('账号框没有任何提示性命名时：紧挨首个密码框之前的文本框视为账号框', () => {
+  const form = document.getElementById('login');
+  form.replaceChildren();
+  const account = document.createElement('input');
+  account.type = 'text';
+  const pass = document.createElement('input');
+  pass.type = 'password';
+  const confirm = document.createElement('input');
+  confirm.type = 'password';
+  form.append(account, pass, confirm);
+  const fields = detectFields(document);
+  // 确认密码框不会被再次当作待填字段
+  assert.deepEqual(
+    fields.map((field) => field.kind),
+    ['username', 'password'],
+  );
+  assert.equal(fields[0].element, account);
+  assert.equal(fields[1].element, pass);
+});
+
+test('pairUsernameFor：同表单内优先，否则取文档顺序上最近的前一个账号框', async () => {
+  const { pairUsernameFor } = await import('../.test-build/src/content/detector.js');
+  const form = document.getElementById('login');
+  const first = form.querySelector('#username');
+  const password = form.querySelector('#password');
+  assert.equal(pairUsernameFor(password), first);
+
+  // 两个都不在表单里：密码框取它前面最近的那个账号框
+  const orphanUser = document.createElement('input');
+  orphanUser.name = 'login';
+  orphanUser.type = 'text';
+  const orphanPass = document.createElement('input');
+  orphanPass.type = 'password';
+  document.body.append(orphanUser, orphanPass);
+  assert.equal(pairUsernameFor(orphanPass), orphanUser);
+});
+
+test('只有与输入框有关的 DOM 变动才算相关（把频繁重渲染的噪声挡在重新扫描之外）', async () => {
+  const { isFieldRelevantMutation } = await import('../.test-build/src/content/detector.js');
+  // 浏览器里 Element 本来就是全局；jsdom 需要显式挂上
+  globalThis.Element = dom.window.Element;
+  const records = await new Promise((resolve) => {
+    const observer = new MutationObserver((mutations) => {
+      observer.disconnect();
+      resolve(mutations);
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style'],
+    });
+    // 无关：普通文本节点
+    const span = document.createElement('span');
+    span.textContent = 'loading…';
+    document.body.append(span);
+    // 相关：子树里带输入框
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = '<input type="password" />';
+    document.body.append(wrapper);
+    // 相关：含有输入框的元素改了样式（登录弹窗显示 / 隐藏）
+    document.getElementById('login').style.display = 'block';
+    // 无关：不含输入框的元素
+    const plain = document.createElement('div');
+    document.body.append(plain);
+    plain.style.display = 'none';
+  });
+  assert.deepEqual(records.map(isFieldRelevantMutation), [false, true, true, false, false]);
+});

@@ -58,6 +58,7 @@ const required = [
   'manifest.json',
   `background${sep}service-worker.js`,
   `content${sep}content.js`,
+  `content${sep}passkeys.js`,
   `ui${sep}popup.html`,
   `ui${sep}popup.js`,
   `ui${sep}options.html`,

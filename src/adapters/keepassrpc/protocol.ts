@@ -45,9 +45,19 @@ export function isSuccess(value: unknown): boolean {
   return value === true || value === 'true';
 }
 
+/** KeePassRPC 的 errorCode 在真实 2.8 响应里是字符串（如 "15"），桩里可能是数字。 */
+export function errorCodeOf(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+}
+
 export function requireSuccess(response: KeePassWireResponse): void {
   if (!isSuccess(response.success)) {
-    const code = typeof response.errorCode === 'number' ? response.errorCode : 0;
+    const code = errorCodeOf(response.errorCode);
     throw new VaultixError(
       code === 1
         ? ERROR_CODES.DATABASE_LOCKED
