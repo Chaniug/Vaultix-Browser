@@ -12,16 +12,17 @@ import type {
   SaveResult,
   SearchQuery,
 } from '../../core/types.js';
-import { bytesToBase64 } from '../../shared/encoding.js';
-import { toErrorCode } from '../../shared/errors.js';
+import { base64ToBytes, bytesToBase64 } from '../../shared/encoding.js';
+import { versionAtLeast } from '../../core/passkeys.js';
+import { ERROR_CODES, toErrorCode, VaultixError } from '../../shared/errors.js';
 import { logDebug, logWarn } from '../../shared/logger.js';
 import {
   changePublicKeysRequest,
   encryptedRequest,
+  errorCodeOf,
   isSuccess,
   parseHostPublicKey,
   requireSuccess,
-  assertResponseNonce,
 } from './protocol.js';
 import {
   createClientKeyPair,
@@ -57,6 +58,8 @@ interface SessionState {
   association: KeePassAssociation | null;
   clientId: string;
   ready: boolean;
+  /** KeePassXC 版本，来自 change-public-keys 响应；用于能力判断 */
+  hostVersion: string | null;
 }
 
 function parseBoolean(value: unknown): boolean | undefined {
@@ -93,6 +96,7 @@ export class KeePassRpcAdapter implements BackendAdapter {
       association: config.association ?? null,
       clientId: config.clientId ?? randomClientId(),
       ready: false,
+      hostVersion: null,
     };
   }
 
@@ -145,6 +149,60 @@ export class KeePassRpcAdapter implements BackendAdapter {
     this.state.association = association;
     this.state.ready = true;
     return association;
+  }
+
+  /** KeePassXC 2.7.7 起支持通行密钥 */
+  supportsPasskeys(): boolean {
+    return this.state.ready && versionAtLeast(this.state.hostVersion, 2, 7, 7);
+  }
+
+  async passkeysRegister(
+    publicKey: Record<string, unknown>,
+    origin: string,
+  ): Promise<Record<string, unknown>> {
+    return this.passkeyCall('passkeys-register', publicKey, origin);
+  }
+
+  async passkeysGet(
+    publicKey: Record<string, unknown>,
+    origin: string,
+  ): Promise<Record<string, unknown>> {
+    return this.passkeyCall('passkeys-get', publicKey, origin);
+  }
+
+  /**
+   * 通行密钥的密码学与存储由 KeePassXC 完成（见 docs/08-通行密钥.md）。
+   * 内层必须带 action / publicKey / origin / keys；返回其 response 对象：
+   * 成功时是 PublicKeyCredential JSON，失败时是 { errorCode }。
+   */
+  private async passkeyCall(
+    action: 'passkeys-register' | 'passkeys-get',
+    publicKey: Record<string, unknown>,
+    origin: string,
+  ): Promise<Record<string, unknown>> {
+    const association = this.state.association;
+    if (association === null) throw new VaultixError(ERROR_CODES.ASSOCIATION_REQUIRED);
+    const response = await this.call(
+      action,
+      {
+        action,
+        publicKey,
+        origin,
+        relatedOrigins: [],
+        keys: [{ id: association.id, key: association.key }],
+      },
+      { allowProtocolError: true },
+    );
+    // 外层或内层都可能带回 errorCode：统一成 { errorCode } 交给页面映射
+    const outerCode = response.errorCode;
+    if (outerCode !== undefined && response.response === undefined) {
+      return { errorCode: outerCode };
+    }
+    const payload = response.response;
+    if (typeof payload !== 'object' || payload === null) {
+      throw new VaultixError(ERROR_CODES.PROTOCOL_MISMATCH);
+    }
+    return payload as Record<string, unknown>;
   }
 
   async search(query: SearchQuery): Promise<readonly CredentialItem[]> {
@@ -300,8 +358,14 @@ export class KeePassRpcAdapter implements BackendAdapter {
   }
 
   private async ensureHandshake(): Promise<void> {
-    if (this.state.keys) return;
-    await this.transport.connect();
+    if (this.state.keys && this.transport.connected) return;
+    if (!this.transport.connected) {
+      // 端口已断（service worker 存活期间 KeePassXC 重启 / 浏览器回收端口）：
+      // 旧会话密钥随之作废，必须重新握手，不能沿用 state.keys
+      this.state.keys = null;
+      this.state.ready = false;
+      await this.transport.connect();
+    }
     const clientKeyPair = createClientKeyPair();
     const nonce = randomNonce();
     const wire = await this.transport.send(
@@ -309,15 +373,19 @@ export class KeePassRpcAdapter implements BackendAdapter {
     );
     requireSuccess(wire);
     const hostPublicKey = parseHostPublicKey(wire);
+    this.state.hostVersion = typeof wire.version === 'string' ? wire.version : null;
     this.state.keys = { clientKeyPair, hostPublicKey, nonce };
     logDebug('keepassrpc.handshake', { backend: 'keepassxc', ok: true });
   }
 
-  /** 串行加密调用：noce 每次随机，响应 nonce 必须为请求 nonce + 1。 */
+  /**
+   * 串行加密调用：请求 nonce 用于封箱，响应 nonce 由服务端另行生成。
+   * 真实 KeePassXC（2.8 实测）用「响应 nonce」加密 message，且该 nonce 不是请求 nonce + 1。
+   */
   private async call(
     action: string,
     payload: Record<string, unknown>,
-    options: { allowNoMatch?: boolean } = {},
+    options: { allowNoMatch?: boolean; allowProtocolError?: boolean } = {},
   ): Promise<Record<string, unknown>> {
     const keys = this.state.keys;
     if (!keys) throw new Error('handshake required');
@@ -327,19 +395,32 @@ export class KeePassRpcAdapter implements BackendAdapter {
     const wire: KeePassWireResponse = await this.transport.send(
       encryptedRequest(action, message, nonce, this.state.clientId),
     );
-    assertResponseNonce(wire, nonce);
 
     if (typeof wire.message !== 'string') {
-      if (wire.errorCode === KEEPASS_ERROR_NO_MATCH && options.allowNoMatch) {
+      // 通行密钥的错误走未加密的外层回复（实测 2.8.0：errorCode 为字符串），
+      // 必须原样带回，否则页面只能拿到一个笼统的失败
+      if (options.allowProtocolError === true) {
+        const code = errorCodeOf(wire.errorCode);
+        return code > 0 ? { errorCode: code } : {};
+      }
+      if (errorCodeOf(wire.errorCode) === KEEPASS_ERROR_NO_MATCH && options.allowNoMatch) {
         return {};
       }
       requireSuccess(wire);
       throw new Error('missing encrypted payload');
     }
-
-    const decrypted = open(wire.message, keys.hostPublicKey, keys.clientKeyPair.secretKey, nonce);
+    if (typeof wire.nonce !== 'string' || wire.nonce.length === 0) {
+      throw new VaultixError(ERROR_CODES.PROTOCOL_MISMATCH);
+    }
+    const responseNonce = base64ToBytes(wire.nonce);
+    const decrypted = open(
+      wire.message,
+      keys.hostPublicKey,
+      keys.clientKeyPair.secretKey,
+      responseNonce,
+    );
     if (!isSuccess(decrypted.success)) {
-      if (decrypted.errorCode === KEEPASS_ERROR_NO_MATCH && options.allowNoMatch) {
+      if (errorCodeOf(decrypted.errorCode) === KEEPASS_ERROR_NO_MATCH && options.allowNoMatch) {
         return decrypted;
       }
       requireSuccess(decrypted);

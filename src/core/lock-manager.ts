@@ -21,6 +21,25 @@ export const DEFAULT_LOCK_POLICY: LockPolicy = {
   idleLockMs: 15 * 60 * 1000,
 };
 
+/**
+ * 可持久化的会话态。只允许写入 chrome.storage.session（内存态，不落盘，S-1），
+ * 用于 service worker 被回收后恢复计时，避免"回收即重置超时"让策略形同虚设。
+ */
+export interface LockSnapshot {
+  readonly state: LockState;
+  readonly lastActivity: number;
+  readonly backgroundSince: number | null;
+}
+
+export function isLockSnapshot(value: unknown): value is LockSnapshot {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  const state = candidate.state;
+  if (state !== 'locked' && state !== 'unlocked' && state !== 'suspended') return false;
+  if (typeof candidate.lastActivity !== 'number') return false;
+  return candidate.backgroundSince === null || typeof candidate.backgroundSince === 'number';
+}
+
 export class LockManager {
   private state: LockState = 'locked';
   private lastActivity = 0;
@@ -88,5 +107,21 @@ export class LockManager {
       return this.handle('LOCK');
     }
     return this.state;
+  }
+
+  /** 导出会话态：调用方负责写 chrome.storage.session（S-1） */
+  snapshot(): LockSnapshot {
+    return {
+      state: this.state,
+      lastActivity: this.lastActivity,
+      backgroundSince: this.backgroundSince,
+    };
+  }
+
+  /** 从会话态恢复：仅在 service worker 重启后调用，恢复后仍按剩余时间判定超时 */
+  restore(snapshot: LockSnapshot): void {
+    this.state = snapshot.state;
+    this.lastActivity = snapshot.lastActivity;
+    this.backgroundSince = snapshot.backgroundSince;
   }
 }

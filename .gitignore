@@ -21,3 +21,6 @@ Thumbs.db
 
 # 商店截图临时预览页
 store-assets/.preview/
+
+# 本地 AI 工作备忘（含本机路径与调试记录，不入库）
+.workbuddy/

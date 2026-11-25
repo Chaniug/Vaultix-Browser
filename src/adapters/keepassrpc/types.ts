@@ -29,6 +29,8 @@ export type KeePassWireResponse = Record<string, unknown> & {
   readonly success?: string | boolean;
   readonly error?: string;
   readonly errorCode?: number;
+  /** 服务端为本次响应另行生成的 nonce，加密 message 用它（非请求 nonce） */
+  readonly nonce?: string;
 };
 
 export interface NativeTransport {
@@ -38,5 +40,11 @@ export interface NativeTransport {
   disconnect(): void;
 }
 
-export const NATIVE_APP_ID = 'org.keepassxc.keepassxc_browser';
+/**
+ * 使用专属 Native Messaging host，而不是官方 KeePassXC-Browser 的 host ID。
+ * 原因：KeePassXC 启动时会重写官方 manifest，只保留它自己认可的两个扩展 ID，
+ * 本项目扩展 ID 会被覆盖，导致 connectNative 被拒。专属 host 由本项目注册，不会被覆盖。
+ * 协议仍由 keepassxc-proxy.exe 承载，host 名称不影响通信内容。
+ */
+export const NATIVE_APP_ID = 'org.keepassxc.keepassxc_browser_vaultix';
 export const KEEPASS_ERROR_NO_MATCH = 15;

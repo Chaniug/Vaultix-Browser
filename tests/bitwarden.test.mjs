@@ -6,12 +6,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import nodeCrypto from 'node:crypto';
 import {
+  BitwardenClient,
   createBitwardenAdapter,
   resolveEndpoints,
 } from '../.test-build/src/adapters/bitwarden/index.js';
 import {
   deriveMasterKey,
-  deriveStretchedKey,
+  hashMasterPassword,
+  stretchMasterKey,
   decryptCipherString,
 } from '../.test-build/src/adapters/bitwarden/crypto.js';
 import { base64ToBytes } from '../.test-build/src/shared/encoding.js';
@@ -22,6 +24,18 @@ const ITERATIONS = 1000;
 const SYMMETRIC_KEY = nodeCrypto.randomBytes(64);
 const MASTER_KEY = await deriveMasterKey(EMAIL, PASSWORD, ITERATIONS);
 
+/** Bitwarden HKDF-Expand：以 masterKey 为 PRK，info 为 'enc' / 'mac'，单步 HMAC-SHA256。 */
+function hkdfExpand(prk, info) {
+  return nodeCrypto
+    .createHmac('sha256', prk)
+    .update(Buffer.concat([Buffer.from(info, 'utf8'), Buffer.from([0x01])]))
+    .digest();
+}
+
+function stretched(masterKey) {
+  return Buffer.concat([hkdfExpand(masterKey, 'enc'), hkdfExpand(masterKey, 'mac')]);
+}
+
 function encString(text, key = SYMMETRIC_KEY) {
   const iv = nodeCrypto.randomBytes(16);
   const cipher = nodeCrypto.createCipheriv('aes-256-cbc', key.subarray(0, 32), iv);
@@ -30,14 +44,19 @@ function encString(text, key = SYMMETRIC_KEY) {
     .createHmac('sha256', key.subarray(32, 64))
     .update(Buffer.concat([iv, ciphertext]))
     .digest();
-  return `2.${iv.toString('base64')}.${ciphertext.toString('base64')}.${mac.toString('base64')}`;
+  return `2.${iv.toString('base64')}|${ciphertext.toString('base64')}|${mac.toString('base64')}`;
 }
 
 function protectedKey(masterKey, symmetricKey) {
+  const key = stretched(masterKey);
   const iv = nodeCrypto.randomBytes(16);
-  const cipher = nodeCrypto.createCipheriv('aes-256-cbc', masterKey.subarray(0, 32), iv);
+  const cipher = nodeCrypto.createCipheriv('aes-256-cbc', key.subarray(0, 32), iv);
   const ciphertext = Buffer.concat([cipher.update(symmetricKey), cipher.final()]);
-  return Buffer.concat([iv, ciphertext]).toString('base64');
+  const mac = nodeCrypto
+    .createHmac('sha256', key.subarray(32, 64))
+    .update(Buffer.concat([iv, ciphertext]))
+    .digest();
+  return `2.${iv.toString('base64')}|${ciphertext.toString('base64')}|${mac.toString('base64')}`;
 }
 
 function installFetchStub() {
@@ -120,15 +139,16 @@ test('PBKDF2 向量与 Node 标准库一致', async () => {
   const master = await deriveMasterKey(EMAIL, PASSWORD, ITERATIONS);
   assert.deepEqual([...master], [...expectedMaster]);
 
-  const expectedStretched = nodeCrypto.pbkdf2Sync(
-    expectedMaster,
-    PASSWORD,
-    ITERATIONS,
-    32,
-    'sha256',
-  );
-  const stretched = await deriveStretchedKey(master, PASSWORD, ITERATIONS);
-  assert.deepEqual([...stretched], [...expectedStretched]);
+  // 拉伸密钥 = HKDF-Expand(masterKey,'enc') || HKDF-Expand(masterKey,'mac')
+  const expectedStretched = stretched(expectedMaster);
+  const actualStretched = await stretchMasterKey(master);
+  assert.deepEqual([...actualStretched], [...expectedStretched]);
+
+  // 认证哈希 = 单轮 PBKDF2(masterKey, 主密码)
+  const expectedHash = nodeCrypto
+    .pbkdf2Sync(expectedMaster, Buffer.from(PASSWORD, 'utf8'), 1, 32, 'sha256')
+    .toString('base64');
+  assert.equal(await hashMasterPassword(master, PASSWORD), expectedHash);
 });
 
 test('AES-256-CBC + HMAC 字段解密与篡改检测', async () => {
@@ -136,12 +156,12 @@ test('AES-256-CBC + HMAC 字段解密与篡改检测', async () => {
   const encrypted = encString(plain);
   assert.equal(await decryptCipherString(encrypted, SYMMETRIC_KEY), plain);
 
-  const parts = encrypted.split('.');
-  const mac = base64ToBytes(parts[3]);
+  const parts = encrypted.slice(2).split('|');
+  const mac = base64ToBytes(parts[2]);
   mac[0] ^= 0xff;
-  parts[3] = Buffer.from(mac).toString('base64');
+  parts[2] = Buffer.from(mac).toString('base64');
   await assert.rejects(
-    () => decryptCipherString(parts.join('.'), SYMMETRIC_KEY),
+    () => decryptCipherString(`2.${parts.join('|')}`, SYMMETRIC_KEY),
     (error) => error.code === 'DECRYPT_FAILED',
   );
 });
@@ -182,11 +202,33 @@ test('登录 → sync → 解密 → URI 匹配（Vaultwarden 配置）', async 
     const form = new URLSearchParams(tokenCall.init.body);
     assert.equal(form.get('grant_type'), 'password');
     assert.equal(form.get('username'), EMAIL);
-    assert.equal(form.has('password'), true);
+    assert.equal(
+      form.get('password'),
+      nodeCrypto
+        .pbkdf2Sync(MASTER_KEY, Buffer.from(PASSWORD, 'utf8'), 1, 32, 'sha256')
+        .toString('base64'),
+    );
 
     const syncCall = stub.seen.find((entry) => entry.url.includes('/api/sync'));
     assert.equal(syncCall.url, 'https://vault.example.test/api/sync?excludeDomains=true');
     assert.equal(syncCall.init.headers.Authorization, 'Bearer test-access-token');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('TOTP 登录请求使用官方字段名 twoFactorToken / twoFactorProvider', async () => {
+  const stub = installFetchStub();
+  try {
+    const client = new BitwardenClient('https://vault.example.test', 'vaultwarden');
+    await client.loginWithPassword(EMAIL, 'auth-hash', '123456');
+    const call = stub.seen.find((entry) => entry.url.includes('/connect/token'));
+    const form = new URLSearchParams(call.init.body);
+    assert.equal(form.get('twoFactorToken'), '123456');
+    assert.equal(form.get('twoFactorProvider'), '0');
+    assert.equal(form.get('twoFactorRemember'), '0');
+    assert.equal(form.has('twoFactorCode'), false);
+    assert.equal(form.has('twoFactorMethod'), false);
   } finally {
     stub.restore();
   }

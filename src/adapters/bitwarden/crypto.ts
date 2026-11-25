@@ -52,13 +52,57 @@ export function deriveMasterKey(
   return pbkdf2(utf8ToBytes(masterPassword), utf8ToBytes(email.toLowerCase()), iterations);
 }
 
-/** 拉伸密钥：PBKDF2(masterKey, masterPassword, iterations)，用于登录哈希 */
-export function deriveStretchedKey(
+/** HKDF-Expand（RFC 5869 单步）：Bitwarden 以 masterKey 作为 PRK，info 固定 'enc' / 'mac'。 */
+async function hkdfExpand(prk: Uint8Array, info: 'enc' | 'mac'): Promise<Uint8Array> {
+  const key = await subtle().importKey(
+    'raw',
+    bufferSource(prk),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const input = new Uint8Array([...utf8ToBytes(info), 0x01]);
+  return new Uint8Array(await subtle().sign('HMAC', key, bufferSource(input)));
+}
+
+/**
+ * 拉伸主密钥：HKDF-Expand(masterKey, 'enc') 与 HKDF-Expand(masterKey, 'mac') 各 32 字节。
+ * 前 32 字节用于 AES、后 32 字节用于 HMAC，因此拼接后为 64 字节。
+ */
+export async function stretchMasterKey(masterKey: Uint8Array): Promise<Uint8Array> {
+  return concatBytes(await hkdfExpand(masterKey, 'enc'), await hkdfExpand(masterKey, 'mac'));
+}
+
+/** 服务端认证哈希：PBKDF2(masterKey, masterPassword, 1)，Base64 后作为 password 字段发送。 */
+export async function hashMasterPassword(
   masterKey: Uint8Array,
   masterPassword: string,
-  iterations = PBKDF2_ITERATIONS,
-): Promise<Uint8Array> {
-  return pbkdf2(masterKey, utf8ToBytes(masterPassword), iterations);
+): Promise<string> {
+  return bytesToBase64(await pbkdf2(masterKey, utf8ToBytes(masterPassword), 1));
+}
+
+/**
+ * 解析 Bitwarden EncString：形如 `2.<ivB64>|<ctB64>|<macB64>`。
+ * 兼容历史测试夹具中 `2.<iv>.<ct>.<mac>` 的写法，但线上协议使用竖线分隔。
+ */
+function parseEncString(value: string): {
+  iv: Uint8Array;
+  ciphertext: Uint8Array;
+  mac: Uint8Array;
+} {
+  const body = value.startsWith('2.') ? value.slice(2) : value;
+  const parts = body.includes('|') ? body.split('|') : body.split('.');
+  if (parts.length < 2) throw new VaultixError(ERROR_CODES.DECRYPT_FAILED);
+  const iv = base64ToBytes(parts[0] ?? '');
+  const ciphertext = base64ToBytes(parts[1] ?? '');
+  const mac =
+    typeof parts[2] === 'string' && parts[2].length > 0
+      ? base64ToBytes(parts[2])
+      : new Uint8Array(0);
+  if (iv.length !== 16 || ciphertext.length === 0) {
+    throw new VaultixError(ERROR_CODES.DECRYPT_FAILED);
+  }
+  return { iv, ciphertext, mac };
 }
 
 async function aesCbcDecrypt(
@@ -77,20 +121,21 @@ async function aesCbcDecrypt(
   return new Uint8Array(plain);
 }
 
-/** 解密受保护对称密钥：AES-CBC(masterKey[0:32], iv || ciphertext) */
+/**
+ * 解密 Protected Symmetric Key。
+ * profile.key 是 type=2 EncString，需先用 HKDF 拉伸出的 enc/mac 密钥校验 MAC 并解密，
+ * 得到 64 字节用户对称密钥（前 32 enc、后 32 mac）。
+ */
 export async function decryptSymmetricKey(
   protectedKey: string,
-  masterKey: Uint8Array,
+  stretchedKey: Uint8Array,
 ): Promise<Uint8Array> {
-  if (masterKey.length < 32) throw new VaultixError(ERROR_CODES.DECRYPT_FAILED);
-  const encrypted = base64ToBytes(protectedKey);
-  if (encrypted.length <= 16) throw new VaultixError(ERROR_CODES.DECRYPT_FAILED);
+  if (stretchedKey.length < 64) throw new VaultixError(ERROR_CODES.DECRYPT_FAILED);
   try {
-    const plain = await aesCbcDecrypt(
-      encrypted.slice(16),
-      masterKey.slice(0, 32),
-      encrypted.slice(0, 16),
-    );
+    const { iv, ciphertext, mac } = parseEncString(protectedKey);
+    if (mac.length === 0) throw new VaultixError(ERROR_CODES.DECRYPT_FAILED);
+    await verifyMac(iv, ciphertext, mac, stretchedKey.slice(32, 64));
+    const plain = await aesCbcDecrypt(ciphertext, stretchedKey.slice(0, 32), iv);
     if (plain.length < 64) throw new VaultixError(ERROR_CODES.DECRYPT_FAILED);
     return plain;
   } catch (error) {
@@ -147,14 +192,12 @@ export async function decryptCipherString(
   symmetricKey: Uint8Array,
 ): Promise<string> {
   if (typeof value !== 'string' || value.length === 0) return '';
-  const parts = value.split('.');
-  if (parts.length < 4 || parts[0] !== '2' || symmetricKey.length < 64) {
+  if (!value.startsWith('2.') || symmetricKey.length < 64) {
     throw new VaultixError(ERROR_CODES.DECRYPT_FAILED);
   }
   try {
-    const iv = base64ToBytes(parts[1] ?? '');
-    const ciphertext = base64ToBytes(parts[2] ?? '');
-    const mac = base64ToBytes(parts[3] ?? '');
+    const { iv, ciphertext, mac } = parseEncString(value);
+    if (mac.length === 0) throw new VaultixError(ERROR_CODES.DECRYPT_FAILED);
     await verifyMac(iv, ciphertext, mac, symmetricKey.slice(32, 64));
     const plain = await aesCbcDecrypt(ciphertext, symmetricKey.slice(0, 32), iv);
     return bytesToUtf8(plain);
@@ -199,5 +242,5 @@ export async function encryptCipherString(
   const mac = new Uint8Array(
     await subtle().sign('HMAC', macKey, bufferSource(concatBytes(iv, ciphertext))),
   );
-  return `2.${bytesToBase64(iv)}.${bytesToBase64(ciphertext)}.${bytesToBase64(mac)}`;
+  return `2.${bytesToBase64(iv)}|${bytesToBase64(ciphertext)}|${bytesToBase64(mac)}`;
 }

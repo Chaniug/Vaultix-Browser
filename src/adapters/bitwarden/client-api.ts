@@ -89,8 +89,10 @@ export class BitwardenClient {
       password: stretchedKeyBase64,
     };
     if (twoFactorCode !== undefined) {
-      form.twoFactorCode = twoFactorCode;
-      form.twoFactorMethod = '0';
+      // 与 bitwarden/clients 的 TokenRequest.toIdentityToken() 保持一致。
+      form.twoFactorToken = twoFactorCode;
+      form.twoFactorProvider = '0'; // Authenticator（TOTP）
+      form.twoFactorRemember = '0';
     }
     return this.tokenRequest(form);
   }

@@ -75,6 +75,47 @@
 
       <section class="card">
         <div class="card-head">
+          <span class="badge source-badge keepassxc" aria-hidden="true">填充</span>
+          <div>
+            <h2>页面内填充</h2>
+            <p>输入框内的填充图标、候选列表与保存提示</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <label class="switch-row">
+            <input id="auto-fill-on-load" type="checkbox" checked />
+            <span>
+              打开网页时自动填充
+              <small
+                >仅当该站点只匹配到一条凭证、且账号和密码框都为空时才自动填入；其余情况只弹出候选，由你选择。</small
+              >
+            </span>
+          </label>
+          <p class="hint">
+            页面内填充按站点开启：在目标网站点开扩展面板，点「本站启用页面内填充」并授权。Vaultix
+            不申请全站访问权限。
+          </p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <span class="badge source-badge keepassxc" aria-hidden="true">站点</span>
+          <div>
+            <h2>已启用的站点</h2>
+            <p>页面内填充只对这些站点生效</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="site-list" class="site-list"></div>
+          <p class="hint">
+            撤销后刷新该站点页面即停用。密码库服务端的地址不在此列出，它属于登录所需。
+          </p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
           <span class="badge source-badge bitwarden" aria-hidden="true">⏱</span>
           <div>
             <h2>安全与保存策略</h2>

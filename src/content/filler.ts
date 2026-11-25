@@ -2,13 +2,10 @@
  * 填充引擎（S-4）：只写 input.value 并派发 input/change 事件。
  * 绝不把凭证写入页面可读的属性、全局变量或 DOM 节点特性。
  */
+import type { FillPlan } from '../core/fill.js';
 import type { DetectedField } from './detector.js';
 
-export interface FillPlan {
-  readonly username?: string;
-  readonly password?: string;
-  readonly totp?: string;
-}
+export type { FillPlan };
 
 export function fillFields(fields: readonly DetectedField[], plan: FillPlan): number {
   let filled = 0;

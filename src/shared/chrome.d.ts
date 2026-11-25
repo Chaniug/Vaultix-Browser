@@ -60,15 +60,48 @@ interface ChromeMessageSender {
 interface ChromePermissions {
   contains(permissions: ChromeMessage): Promise<boolean>;
   request(permissions: ChromeMessage): Promise<boolean>;
+  remove(permissions: ChromeMessage): Promise<boolean>;
+  /** 已授予的权限与 host 匹配串（含运行时按站点授予的 optional host） */
+  getAll(): Promise<{
+    readonly origins?: readonly string[];
+    readonly permissions?: readonly string[];
+  }>;
+  onAdded: {
+    addListener(cb: (permissions: ChromeMessage) => void): void;
+  };
+  onRemoved: {
+    addListener(cb: (permissions: ChromeMessage) => void): void;
+  };
+}
+
+interface RegisteredContentScript {
+  readonly id: string;
 }
 
 interface ChromeScripting {
-  executeScript(injection: { target: { tabId: number }; files: string[] }): Promise<unknown[]>;
+  /** world: 'MAIN' 用于注入页面主世界脚本（通行密钥需要） */
+  executeScript(injection: {
+    target: { tabId: number };
+    files: string[];
+    world?: 'ISOLATED' | 'MAIN';
+  }): Promise<unknown[]>;
+  getRegisteredContentScripts(): Promise<readonly RegisteredContentScript[]>;
+  registerContentScripts(scripts: readonly ChromeMessage[]): Promise<void>;
+  updateContentScripts(scripts: readonly ChromeMessage[]): Promise<void>;
+  unregisterContentScripts(filter: { ids: readonly string[] }): Promise<void>;
 }
 
 interface ChromeTabs {
   query(queryInfo: ChromeMessage): Promise<ChromeTab[]>;
   sendMessage(tabId: number, message: ChromeMessage): Promise<ChromeMessage>;
+}
+
+/** 只需窗口焦点事件；不读取标签页内容，因此不需要额外权限 */
+interface ChromeWindows {
+  readonly WINDOW_ID_NONE: number;
+  onFocusChanged: {
+    addListener(cb: (windowId: number) => void): void;
+  };
 }
 
 interface ChromeNotifications {
@@ -91,7 +124,13 @@ interface ChromeOffscreen {
   hasDocument(): Promise<boolean>;
 }
 
+interface ChromeAction {
+  /** 需要用户手势；Chrome 127+ 对所有扩展开放，不支持时会 reject */
+  openPopup(): Promise<void>;
+}
+
 interface ChromeApi {
+  readonly action: ChromeAction;
   readonly offscreen: ChromeOffscreen;
   readonly runtime: ChromeRuntime;
   readonly storage: {
@@ -102,6 +141,7 @@ interface ChromeApi {
   readonly permissions: ChromePermissions;
   readonly scripting: ChromeScripting;
   readonly tabs: ChromeTabs;
+  readonly windows: ChromeWindows;
   readonly notifications: ChromeNotifications;
   readonly contextMenus: ChromeContextMenus;
 }
